@@ -1,0 +1,283 @@
+{
+  "name": "gitspectra",
+  "displayName": "GitSpectra",
+  "description": "See the full spectrum of your Git. Local-only conflict detection for VS Code. No cloud. No tracking. Just Git.",
+  "version": "0.1.0",
+  "publisher": "gitspectra",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gitspectra/gitspectra"
+  },
+  "bugs": {
+    "url": "https://github.com/gitspectra/gitspectra/issues"
+  },
+  "homepage": "https://gitspectra.dev",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "conflict",
+    "merge",
+    "collaboration",
+    "team",
+    "spectrum",
+    "visibility"
+  ],
+  "activationEvents": [
+    "workspaceContains:.git"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gitspectra.checkNow",
+        "title": "Check Now",
+        "category": "GitSpectra",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gitspectra.showPanel",
+        "title": "Show Conflict Panel",
+        "category": "GitSpectra",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "gitspectra.configure",
+        "title": "Configure",
+        "category": "GitSpectra",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "gitspectra.dismissAll",
+        "title": "Dismiss All Conflicts",
+        "category": "GitSpectra"
+      },
+      {
+        "command": "gitspectra.dismissFile",
+        "title": "Dismiss Conflicts in File",
+        "category": "GitSpectra"
+      },
+      {
+        "command": "gitspectra.cherryPick",
+        "title": "Cherry Pick Changes",
+        "category": "GitSpectra",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "gitspectra.viewDiff",
+        "title": "View Diff",
+        "category": "GitSpectra",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "gitspectra.openFileDiff",
+        "title": "Open File Diff",
+        "category": "GitSpectra",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "gitspectra.copyLogs",
+        "title": "Copy All Logs to Clipboard",
+        "category": "GitSpectra",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "gitspectra.showLogs",
+        "title": "Show Logs",
+        "category": "GitSpectra",
+        "icon": "$(output)"
+      },
+      {
+        "command": "gitspectra.refreshActivity",
+        "title": "Refresh Activity Feed",
+        "category": "GitSpectra",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitspectra.showActivityFeed",
+        "title": "Show Activity Feed",
+        "category": "GitSpectra",
+        "icon": "$(pulse)"
+      }
+    ],
+    "configuration": {
+      "title": "GitSpectra",
+      "properties": {
+        "gitspectra.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable GitSpectra conflict detection"
+        },
+        "gitspectra.fetchInterval": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "description": "Interval in seconds between automatic fetches (0 = disabled)"
+        },
+        "gitspectra.fetchOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fetch remote changes when saving a file"
+        },
+        "gitspectra.fetchOnFocus": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fetch remote changes when focusing a file"
+        },
+        "gitspectra.scope.branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["origin/main"],
+          "description": "Branches to check for conflicts against"
+        },
+        "gitspectra.scope.excludeBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["origin/dependabot/*", "origin/renovate/*"],
+          "description": "Branch patterns to exclude from conflict checking"
+        },
+        "gitspectra.scope.authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Only check commits from these authors (empty = all authors)"
+        },
+        "gitspectra.scope.timeWindow": {
+          "type": "string",
+          "default": "30d",
+          "pattern": "^\\d+[hdwm]$",
+          "description": "Only check commits within this time window (e.g., '7d', '2w', '1m')"
+        },
+        "gitspectra.ui.showGutterIcons": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show conflict indicators in the editor gutter"
+        },
+        "gitspectra.ui.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show conflict count in the status bar"
+        }
+      }
+    },
+    "views": {
+      "gitspectra": [
+        {
+          "id": "gitspectra.panel",
+          "name": "Conflict Radar",
+          "when": "gitspectra.hasGit"
+        },
+        {
+          "id": "gitspectra.activityFeed",
+          "type": "webview",
+          "name": "Activity Feed",
+          "when": "gitspectra.hasGit"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitspectra",
+          "title": "GitSpectra",
+          "icon": "$(telescope)"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "gitspectra.panel",
+        "contents": "No conflicts detected.\n[Check Now](command:gitspectra.checkNow)\n[Configure](command:gitspectra.configure)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gitspectra.checkNow",
+          "when": "gitspectra.hasGit"
+        },
+        {
+          "command": "gitspectra.showPanel",
+          "when": "gitspectra.hasGit"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "gitspectra.checkNow",
+          "group": "navigation",
+          "when": "gitspectra.hasGit"
+        }
+      ]
+    },
+    "colors": [
+      {
+        "id": "gitspectra.conflictBackground",
+        "description": "Background color for lines with hard conflicts",
+        "defaults": {
+          "dark": "#ef444420",
+          "light": "#ef444420",
+          "highContrast": "#ef4444"
+        }
+      },
+      {
+        "id": "gitspectra.warningBackground",
+        "description": "Background color for lines with warnings",
+        "defaults": {
+          "dark": "#f59e0b20",
+          "light": "#f59e0b20",
+          "highContrast": "#f59e0b"
+        }
+      },
+      {
+        "id": "gitspectra.conflictBadge",
+        "description": "Badge color for files with hard conflicts in explorer",
+        "defaults": {
+          "dark": "#ef4444",
+          "light": "#dc2626",
+          "highContrast": "#ef4444"
+        }
+      },
+      {
+        "id": "gitspectra.warningBadge",
+        "description": "Badge color for files with warnings in explorer",
+        "defaults": {
+          "dark": "#f59e0b",
+          "light": "#d97706",
+          "highContrast": "#f59e0b"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "lint": "eslint src --ext ts",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "esbuild": "^0.19.8",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2",
+    "vitest": "^1.0.0"
+  }
+}
