@@ -1,9 +1,13 @@
-# 🔭 GitSpectra
-
-**See the full spectrum of your Git. Local-only conflict detection for VS Code.**
-
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![VS Code](https://img.shields.io/badge/VS%20Code-Extension-blue.svg)](https://marketplace.visualstudio.com/)
+<div align="center">
+  <img src="images/banner.png" alt="GitSpectra Banner" width="100%">
+  
+  <br>
+  
+  [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+  [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-blue.svg)](https://marketplace.visualstudio.com/items?itemName=gitspectra.gitspectra)
+  
+  **Local-First Repo Intelligence. See the full spectrum of your Git.**
+</div>
 
 ---
 

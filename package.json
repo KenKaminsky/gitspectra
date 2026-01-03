@@ -6,6 +6,10 @@
   "publisher": "gitspectra",
   "license": "AGPL-3.0-only",
   "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#161d27",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/gitspectra/gitspectra"
