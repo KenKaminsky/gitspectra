@@ -1,0 +1,28 @@
+# Source files (compiled to dist/)
+src/**
+*.ts
+tsconfig.json
+
+# Development files
+.github/**
+.vscode/**
+docs/**
+esbuild.config.mjs
+
+# Git
+.git/**
+.gitignore
+
+# Misc
+*.vsix
+node_modules/**
+*.md
+!README.md
+!CHANGELOG.md
+
+# Keep only essential images
+images/icon-square.png
+images/logo-full.png
+images/logo-horizontal.png
+images/og-image.png
+
