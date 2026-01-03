@@ -2,7 +2,7 @@
 
 **See the full spectrum of your Git. Local-only conflict detection for VS Code.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-blue.svg)](https://marketplace.visualstudio.com/)
 
 ---
@@ -178,7 +178,7 @@ GitSpectra uses standard Git commands to detect conflicts locally:
 
 | Feature | Cloud-Based Tools | GitSpectra |
 |---------|-------------------|------------|
-| 💰 Free | Freemium | 100% Free (MIT) |
+| 💰 Free | Freemium | 100% Free (AGPL v3) |
 | 🔒 Works offline | ❌ | ✅ |
 | 🏢 Enterprise-ready | ⚠️ Requires cloud | ✅ No cloud needed |
 | 🔐 Data privacy | Cloud-based | Local only |
@@ -247,7 +247,19 @@ npm test
 
 ## 📜 License
 
-MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0).
+
+This means:
+- ✅ You can use, modify, and distribute this software
+- ✅ You can use it commercially
+- ⚠️ Any modifications must also be open source under AGPL-3.0
+- ⚠️ If you run a modified version as a network service, you must share your source code
+
+See [LICENSE](LICENSE) for the full license text.
+
+### Commercial Licensing
+
+Need to use GitSpectra in a proprietary product? Contact us for commercial licensing options.
 
 ---
 

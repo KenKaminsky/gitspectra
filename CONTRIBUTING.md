@@ -38,6 +38,10 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 5. Make sure your code lints
 6. Issue your pull request!
 
+### License Agreement
+
+By contributing to GitSpectra, you agree that your contributions will be licensed under the **AGPL-3.0** license. This ensures all improvements remain open source and benefit the community.
+
 ## Development Setup
 
 ```bash
