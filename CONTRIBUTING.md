@@ -10,7 +10,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 ### Reporting Bugs
 
-Before creating bug reports, please check the [existing issues](https://github.com/gitspectra/gitspectra/issues) as you might find that the issue has already been reported.
+Before creating bug reports, please check the [existing issues](https://github.com/KenKaminsky/gitspectra/issues) as you might find that the issue has already been reported.
 
 When you are creating a bug report, please include as many details as possible:
 
@@ -132,7 +132,7 @@ Releases are handled by maintainers. The process:
 
 ## Questions?
 
-Feel free to open a [Discussion](https://github.com/gitspectra/gitspectra/discussions) if you have questions!
+Feel free to open a [Discussion](https://github.com/KenKaminsky/gitspectra/discussions) if you have questions!
 
 ---
 

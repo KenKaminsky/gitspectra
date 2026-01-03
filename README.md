@@ -234,7 +234,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ### Development Setup
 
 ```bash
-git clone https://github.com/gitspectra/gitspectra.git
+git clone https://github.com/KenKaminsky/gitspectra.git
 cd gitspectra
 npm install
 npm run watch
@@ -277,9 +277,9 @@ Need to use GitSpectra in a proprietary product? Contact us for commercial licen
 
 ## 📣 Feedback
 
-- 🐛 [Report a bug](https://github.com/gitspectra/gitspectra/issues/new?template=bug_report.md)
-- 💡 [Request a feature](https://github.com/gitspectra/gitspectra/issues/new?template=feature_request.md)
-- 💬 [Join the discussion](https://github.com/gitspectra/gitspectra/discussions)
+- 🐛 [Report a bug](https://github.com/KenKaminsky/gitspectra/issues/new?template=bug_report.md)
+- 💡 [Request a feature](https://github.com/KenKaminsky/gitspectra/issues/new?template=feature_request.md)
+- 💬 [Join the discussion](https://github.com/KenKaminsky/gitspectra/discussions)
 
 ---
 
