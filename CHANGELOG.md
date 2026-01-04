@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **PR-like Multi-File Diff View**
+
   - "View Full Diff in VS Code" button now opens all commit changes in a single scrollable view
   - Uses VS Code's native multi-diff editor (requires VS Code 1.86+, no extensions needed)
   - Individual file diffs use VS Code's built-in git scheme for proper syntax highlighting
