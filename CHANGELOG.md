@@ -9,13 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **PR-like Multi-File Diff View**
+  - "View Full Diff in VS Code" button now opens all commit changes in a single scrollable view
+  - Uses VS Code's native multi-diff editor (requires VS Code 1.86+, no extensions needed)
+  - Individual file diffs use VS Code's built-in git scheme for proper syntax highlighting
+  - Fallback to file picker for older VS Code versions
+
 - **Demo Mode for Marketing Videos**
   - `GitSpectra: Demo - Start Scenario` - Run pre-built demo scenarios
   - `GitSpectra: Demo - Inject Conflict` - Manually inject a fake conflict
   - `GitSpectra: Demo - Inject Activity` - Manually inject a fake team activity
   - `GitSpectra: Demo - Stop` / `Demo - Reset` - Control demo playback
   - Pre-built scenarios: Conflict Detection, Activity Feed, Full Overview, Privacy, Looping Activity
-  - Fake team members with realistic names and Gravatar avatars
+  - Fake team members with human-looking DiceBear avatars
   - Timed events for repeatable video recordings
 
 ## [0.1.3] - 2026-01-04

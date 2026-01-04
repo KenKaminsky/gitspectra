@@ -32,6 +32,8 @@ interface ActivityFile {
   status: "added" | "modified" | "deleted";
   youAlsoTouched: boolean;
   hasConflict: boolean;
+  additions?: number;
+  deletions?: number;
 }
 
 export class ActivityFeedProvider implements vscode.WebviewViewProvider {
@@ -354,18 +356,35 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             // Skip if we already have this commit
             if (commitMap.has(commit.hash)) continue;
 
-            // Get changed files
+            // Get changed files with line stats
             let files: ActivityFile[] = [];
             try {
-              const changedFiles = await this.git.getChangedFiles(commit.hash);
-              files = changedFiles.map((path) => ({
-                path,
-                status: "modified" as const,
-                youAlsoTouched: this.yourRecentFiles.has(path),
+              const fileStats = await this.getChangedFilesWithStats(
+                commit.hash
+              );
+              files = fileStats.map((f) => ({
+                path: f.path,
+                status: f.status,
+                youAlsoTouched: this.yourRecentFiles.has(f.path),
                 hasConflict: false, // TODO: detect actual conflicts
+                additions: f.additions,
+                deletions: f.deletions,
               }));
             } catch {
-              // Ignore errors getting files
+              // Fallback to basic file list
+              try {
+                const changedFiles = await this.git.getChangedFiles(
+                  commit.hash
+                );
+                files = changedFiles.map((path) => ({
+                  path,
+                  status: "modified" as const,
+                  youAlsoTouched: this.yourRecentFiles.has(path),
+                  hasConflict: false,
+                }));
+              } catch {
+                // Ignore errors getting files
+              }
             }
 
             const activity: ActivityItem = {
@@ -400,6 +419,63 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     } catch (err) {
       log("ActivityFeed", `Error loading activities: ${err}`);
     }
+  }
+
+  /**
+   * Get changed files with addition/deletion stats
+   */
+  private async getChangedFilesWithStats(commitHash: string): Promise<
+    {
+      path: string;
+      status: "added" | "modified" | "deleted";
+      additions: number;
+      deletions: number;
+    }[]
+  > {
+    const { execSync } = require("child_process");
+
+    // Use git diff-tree with numstat to get additions/deletions per file
+    const output = execSync(
+      `git diff-tree --no-commit-id --numstat -r ${commitHash}`,
+      {
+        cwd: this.workspacePath,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    ).trim();
+
+    if (!output) return [];
+
+    const files: {
+      path: string;
+      status: "added" | "modified" | "deleted";
+      additions: number;
+      deletions: number;
+    }[] = [];
+
+    for (const line of output.split("\n")) {
+      if (!line.trim()) continue;
+
+      // Format: additions<TAB>deletions<TAB>filename
+      const parts = line.split("\t");
+      if (parts.length >= 3) {
+        const additions = parts[0] === "-" ? 0 : parseInt(parts[0]) || 0;
+        const deletions = parts[1] === "-" ? 0 : parseInt(parts[1]) || 0;
+        const path = parts.slice(2).join("\t"); // Handle paths with tabs
+
+        // Determine status
+        let status: "added" | "modified" | "deleted" = "modified";
+        if (additions > 0 && deletions === 0) {
+          status = "added";
+        } else if (deletions > 0 && additions === 0) {
+          status = "deleted";
+        }
+
+        files.push({ path, status, additions, deletions });
+      }
+    }
+
+    return files;
   }
 
   /**
@@ -1112,13 +1188,95 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       }
       
       .commit-stats-summary {
-        font-size: 10px;
+        font-size: 11px;
         color: var(--vscode-descriptionForeground);
-        margin-bottom: 8px;
-        padding: 4px 8px;
-        background: var(--vscode-badge-background);
+        margin: 8px 0;
+        padding: 6px 10px;
+        background: var(--vscode-editor-background);
         border-radius: 4px;
-        display: inline-block;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-left: 3px solid var(--vscode-textLink-foreground);
+      }
+      
+      .commit-stats-summary .stat-label {
+        color: var(--vscode-foreground);
+        font-weight: 500;
+      }
+      
+      /* Inline stats for activity items */
+      .commit-stats {
+        display: inline-flex;
+        gap: 6px;
+        margin-left: 8px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+      
+      .stat-additions {
+        color: #3fb950;
+      }
+      
+      .stat-deletions {
+        color: #f85149;
+      }
+      
+      /* Per-file stats */
+      .file-stats {
+        display: inline-flex;
+        gap: 4px;
+        margin-left: auto;
+        margin-right: 8px;
+        font-size: 10px;
+        font-weight: 500;
+        opacity: 0.9;
+      }
+      
+      /* Commit actions in expanded details */
+      .commit-actions {
+        margin-top: 12px;
+        padding-top: 8px;
+        border-top: 1px solid var(--vscode-widget-border);
+      }
+      
+      .commit-actions .action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--vscode-button-secondaryBackground);
+        color: var(--vscode-button-secondaryForeground);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      
+      .commit-actions .action-btn:hover {
+        background: var(--vscode-button-secondaryHoverBackground);
+      }
+      
+      .no-details {
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+        padding: 8px 0;
+      }
+      
+      .commit-meta-mini {
+        color: var(--vscode-descriptionForeground);
+        font-size: 11px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      
+      .commit-meta-mini code {
+        background: var(--vscode-badge-background);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: var(--vscode-editor-font-family);
       }
       
       .commit-diff {
@@ -2330,8 +2488,23 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       !isYourCommit && activity.files.some((f) => f.youAlsoTouched);
     const hasConflict = activity.files.some((f) => f.hasConflict);
     const isMainBranch = this.mainBranches.has(activity.branch);
-    const isLongMessage = activity.message.length > 80;
     const shortId = activity.id.slice(0, 8);
+
+    // Calculate total additions/deletions
+    const totalAdditions = activity.files.reduce(
+      (sum, f) => sum + (f.additions || 0),
+      0
+    );
+    const totalDeletions = activity.files.reduce(
+      (sum, f) => sum + (f.deletions || 0),
+      0
+    );
+    const hasStats = totalAdditions > 0 || totalDeletions > 0;
+
+    // Parse commit message - first line is the subject
+    const messageLines = activity.message.split("\n");
+    const firstLine = messageLines[0]?.trim() || activity.message;
+    const isLongFirstLine = firstLine.length > 80;
 
     const branchIcon = isMainBranch
       ? '<i class="codicon codicon-git-merge"></i>'
@@ -2343,6 +2516,14 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
     const initialFiles = 5;
     const hasMoreFiles = activity.files.length > initialFiles;
+
+    // Stats display (always visible if we have stats)
+    const statsHtml = hasStats
+      ? `<span class="commit-stats">
+           <span class="stat-additions">+${totalAdditions}</span>
+           <span class="stat-deletions">-${totalDeletions}</span>
+         </span>`
+      : "";
 
     return `
       <div class="activity-item ${hasOverlap ? "has-overlap" : ""} ${
@@ -2362,7 +2543,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <div class="activity-quick-actions">
               <button class="icon-btn-tiny" onclick="event.stopPropagation(); viewCommit('${
                 activity.id
-              }')" title="View commit changes">
+              }')" title="View commit in VS Code diff">
                 <i class="codicon codicon-git-commit"></i>
               </button>
               <button class="icon-btn-tiny" onclick="event.stopPropagation(); openCommitOnGitHub('${
@@ -2373,13 +2554,13 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             </div>
           </div>
           <div class="commit-message ${
-            isLongMessage ? "truncated" : ""
+            isLongFirstLine ? "truncated" : ""
           }" id="msg-${shortId}" onclick="${
-      isLongMessage ? `toggleMessage('${shortId}')` : ""
+      isLongFirstLine ? `toggleMessage('${shortId}')` : ""
     }">
-            ${this.escapeHtml(activity.message)}
+            ${this.escapeHtml(firstLine)}
             ${
-              isLongMessage
+              isLongFirstLine
                 ? '<span class="expand-hint"><i class="codicon codicon-chevron-down"></i></span>'
                 : ""
             }
@@ -2390,6 +2571,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             }" onclick="event.stopPropagation(); toggleCommitDetails('${
       activity.id
     }')">
+            
               <span id="details-text-${activity.id}">Show more</span>
             </button>
           </div>
@@ -2408,6 +2590,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
               <span>${activity.files.length} file${
                   activity.files.length !== 1 ? "s" : ""
                 }</span>
+              ${statsHtml}
               ${
                 hasOverlap
                   ? '<span class="you-badge"><i class="codicon codicon-warning"></i> Overlap</span>'
@@ -2492,12 +2675,32 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         // Show overlap only if not your commit
         const showOverlap = !isYourCommit && file.youAlsoTouched;
 
+        // Per-file stats
+        const hasFileStats =
+          (file.additions !== undefined && file.additions > 0) ||
+          (file.deletions !== undefined && file.deletions > 0);
+        const fileStatsHtml = hasFileStats
+          ? `<span class="file-stats">
+               ${
+                 file.additions
+                   ? `<span class="stat-additions">+${file.additions}</span>`
+                   : ""
+               }
+               ${
+                 file.deletions
+                   ? `<span class="stat-deletions">-${file.deletions}</span>`
+                   : ""
+               }
+             </span>`
+          : "";
+
         return `
         <div class="list-file-row ${showOverlap ? "you-touched" : ""}">
           <i class="codicon codicon-${fileIcon} list-file-icon"></i>
           <span class="list-file-path" onclick="event.stopPropagation(); openFile('${
             file.path
           }')">${file.path}</span>
+          ${fileStatsHtml}
           ${
             showOverlap
               ? '<span class="you-badge-small"><i class="codicon codicon-warning"></i> Overlap</span>'
@@ -2617,6 +2820,25 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         // Show overlap only if not your commit
         const showOverlap = !isYourCommit && file.youAlsoTouched;
 
+        // Per-file stats
+        const hasFileStats =
+          (file.additions !== undefined && file.additions > 0) ||
+          (file.deletions !== undefined && file.deletions > 0);
+        const fileStatsHtml = hasFileStats
+          ? `<span class="file-stats">
+               ${
+                 file.additions
+                   ? `<span class="stat-additions">+${file.additions}</span>`
+                   : ""
+               }
+               ${
+                 file.deletions
+                   ? `<span class="stat-deletions">-${file.deletions}</span>`
+                   : ""
+               }
+             </span>`
+          : "";
+
         html += `
           <div class="tree-row file-row ${
             showOverlap ? "you-touched" : ""
@@ -2625,6 +2847,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <span class="tree-label file-label" onclick="event.stopPropagation(); openFile('${
               file.path
             }')">${name}</span>
+            ${fileStatsHtml}
             ${
               showOverlap
                 ? '<span class="you-badge-small"><i class="codicon codicon-warning"></i> Overlap</span>'
@@ -3041,9 +3264,126 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Open commit diff in VS Code's diff editor
+   * Open commit diff in VS Code's multi-diff editor (PR-like view)
    */
   private async openCommitDiff(commitHash: string): Promise<void> {
+    try {
+      const { execSync } = require("child_process");
+
+      // Get the parent commit (for comparison)
+      let parentHash: string;
+      try {
+        parentHash = execSync(`git rev-parse ${commitHash}^`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+        }).trim();
+      } catch {
+        // No parent (initial commit) - use empty tree
+        parentHash = execSync(`git hash-object -t tree /dev/null`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+        }).trim();
+      }
+
+      // Get the list of changed files with their status
+      const diffOutput = execSync(
+        `git diff-tree --no-commit-id --name-status -r ${commitHash}`,
+        {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+        }
+      ).trim();
+
+      if (!diffOutput) {
+        vscode.window.showInformationMessage("No file changes in this commit");
+        return;
+      }
+
+      const fileChanges = diffOutput.split("\n").map((line: string) => {
+        const [status, ...pathParts] = line.split("\t");
+        return { status: status.charAt(0), path: pathParts.join("\t") };
+      });
+
+      if (fileChanges.length === 0) {
+        vscode.window.showInformationMessage("No file changes in this commit");
+        return;
+      }
+
+      // Get the commit message for the title
+      const commitSubject = execSync(`git log -1 --format="%s" ${commitHash}`, {
+        cwd: this.workspacePath,
+        encoding: "utf-8",
+      }).trim();
+      const shortHash = commitHash.substring(0, 7);
+
+      // Build resources for multi-diff editor using git: scheme URIs
+      // The git: scheme is provided by VS Code's built-in Git extension
+      const resources: {
+        originalUri: vscode.Uri | undefined;
+        modifiedUri: vscode.Uri | undefined;
+      }[] = [];
+
+      for (const change of fileChanges) {
+        const fileUri = vscode.Uri.file(`${this.workspacePath}/${change.path}`);
+
+        // Create git URIs with the ref in the query string (VS Code Git extension format)
+        const toGitUri = (uri: vscode.Uri, ref: string): vscode.Uri => {
+          return uri.with({
+            scheme: "git",
+            query: JSON.stringify({ path: uri.fsPath, ref }),
+          });
+        };
+
+        switch (change.status) {
+          case "A": // Added
+            resources.push({
+              originalUri: undefined,
+              modifiedUri: toGitUri(fileUri, commitHash),
+            });
+            break;
+          case "D": // Deleted
+            resources.push({
+              originalUri: toGitUri(fileUri, parentHash),
+              modifiedUri: undefined,
+            });
+            break;
+          case "M": // Modified
+          case "R": // Renamed (simplified - treat as modified)
+          case "C": // Copied
+          default:
+            resources.push({
+              originalUri: toGitUri(fileUri, parentHash),
+              modifiedUri: toGitUri(fileUri, commitHash),
+            });
+            break;
+        }
+      }
+
+      // Create a unique URI for this diff source
+      const multiDiffSourceUri = vscode.Uri.from({
+        scheme: "gitspectra-commit",
+        path: `${this.workspacePath}/${parentHash}..${commitHash}`,
+      });
+
+      const title = `${shortHash} - ${commitSubject}`;
+
+      // Open the multi-diff editor (VS Code 1.86+)
+      await vscode.commands.executeCommand("_workbench.openMultiDiffEditor", {
+        multiDiffSourceUri,
+        title,
+        resources,
+      });
+    } catch (err) {
+      // Fallback to single file picker if multi-diff fails
+      log("ActivityFeed", `Multi-diff failed, falling back: ${err}`);
+      await this.openCommitDiffFallback(commitHash);
+    }
+  }
+
+  /**
+   * Fallback: Open commit diff with file picker (for older VS Code versions)
+   */
+  private async openCommitDiffFallback(commitHash: string): Promise<void> {
     try {
       const { execSync } = require("child_process");
 
@@ -3079,18 +3419,39 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       });
 
       if (selected) {
-        // Show the diff in an output channel with syntax highlighting
-        const diff = execSync(`git show ${commitHash} -- "${selected.file}"`, {
-          cwd: this.workspacePath,
-          encoding: "utf-8",
+        // Get parent commit
+        let parentHash: string;
+        try {
+          parentHash = execSync(`git rev-parse ${commitHash}^`, {
+            cwd: this.workspacePath,
+            encoding: "utf-8",
+          }).trim();
+        } catch {
+          parentHash = "";
+        }
+
+        // Open single file diff using vscode.diff command
+        const fileUri = vscode.Uri.file(
+          `${this.workspacePath}/${selected.file}`
+        );
+        const oldUri = fileUri.with({
+          scheme: "git",
+          query: JSON.stringify({
+            path: fileUri.fsPath,
+            ref: parentHash || "HEAD~1",
+          }),
+        });
+        const newUri = fileUri.with({
+          scheme: "git",
+          query: JSON.stringify({ path: fileUri.fsPath, ref: commitHash }),
         });
 
-        const outputChannel = vscode.window.createOutputChannel(
-          `GitSpectra: ${selected.label}`
+        await vscode.commands.executeCommand(
+          "vscode.diff",
+          oldUri,
+          newUri,
+          `${selected.file} (${commitHash.substring(0, 7)})`
         );
-        outputChannel.clear();
-        outputChannel.append(diff);
-        outputChannel.show();
       }
     } catch (err) {
       vscode.window.showErrorMessage(`Could not open commit diff: ${err}`);
@@ -3104,18 +3465,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     try {
       const { execSync } = require("child_process");
 
-      // Get commit metadata using safer format
-      const meta = execSync(
-        `git log -1 --format="%an|||%ae|||%ar|||%s" ${commitHash}`,
-        {
-          cwd: this.workspacePath,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        }
-      ).trim();
-      const [author, email, date, subject] = meta.split("|||");
-
-      // Get full commit message (body)
+      // Get full commit message (body - the part after the first line)
       let body = "";
       try {
         body = execSync(`git log -1 --format="%b" ${commitHash}`, {
@@ -3127,67 +3477,141 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         // Ignore body errors
       }
 
-      // Get file stats
-      let stats = "";
+      // Get author and date for context
+      let author = "";
+      let date = "";
       try {
-        stats = execSync(`git diff-tree --stat --no-commit-id ${commitHash}`, {
+        const meta = execSync(`git log -1 --format="%an|||%ar" ${commitHash}`, {
           cwd: this.workspacePath,
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "pipe"],
         }).trim();
+        [author, date] = meta.split("|||");
       } catch {
-        // Ignore stats errors
+        // Ignore errors
       }
 
-      // Get diff
-      let diff = "";
+      // Get numstat for additions/deletions per file
+      let numstat = "";
       try {
-        diff = execSync(`git diff-tree -p --no-commit-id ${commitHash}`, {
-          cwd: this.workspacePath,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-          maxBuffer: 1024 * 1024 * 5, // 5MB
-        });
+        numstat = execSync(
+          `git diff-tree --no-commit-id --numstat -r ${commitHash}`,
+          {
+            cwd: this.workspacePath,
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
+          }
+        ).trim();
       } catch {
-        // Ignore diff errors
+        // Ignore errors
       }
 
-      // Format diff with HTML colors
-      const formattedDiff = this.formatDiffAsHtml(diff);
+      // Parse numstat for totals
+      let totalAdditions = 0;
+      let totalDeletions = 0;
+      const fileStats: {
+        path: string;
+        additions: number;
+        deletions: number;
+      }[] = [];
+
+      if (numstat) {
+        for (const line of numstat.split("\n")) {
+          const parts = line.split("\t");
+          if (parts.length >= 3) {
+            const additions = parts[0] === "-" ? 0 : parseInt(parts[0]) || 0;
+            const deletions = parts[1] === "-" ? 0 : parseInt(parts[1]) || 0;
+            const path = parts.slice(2).join("\t");
+            totalAdditions += additions;
+            totalDeletions += deletions;
+            fileStats.push({ path, additions, deletions });
+          }
+        }
+      }
 
       // Build HTML
-      let html = `
-        <div class="commit-meta">
-          <div class="meta-row"><i class="codicon codicon-person"></i> <strong>${this.escapeHtml(
-            author
-          )}</strong> &lt;${this.escapeHtml(email)}&gt;</div>
-          <div class="meta-row"><i class="codicon codicon-clock"></i> ${this.escapeHtml(
-            date
-          )}</div>
-        </div>
-        <div class="commit-subject">${this.escapeHtml(subject)}</div>
-      `;
+      let html = "";
 
+      // Commit body with proper markdown-like formatting
       if (body) {
-        html += `<div class="commit-body">${this.escapeHtml(body).replace(
-          /\n/g,
-          "<br>"
-        )}</div>`;
+        // Convert markdown-like formatting
+        const formattedBody = this.formatCommitBody(body);
+        html += `<div class="commit-body">${formattedBody}</div>`;
       }
 
-      // Stats summary
-      const statsLines = stats.split("\n").filter((l: string) => l.trim());
-      const summaryLine = statsLines[statsLines.length - 1] || "";
-      html += `<div class="commit-stats-summary">${this.escapeHtml(
-        summaryLine
-      )}</div>`;
+      // Stats summary with colors (if we have any)
+      if (totalAdditions > 0 || totalDeletions > 0) {
+        html += `
+          <div class="commit-stats-summary">
+            <span class="stat-label">${fileStats.length} file${
+          fileStats.length !== 1 ? "s" : ""
+        } changed</span>
+            ${
+              totalAdditions > 0
+                ? `<span class="stat-additions">+${totalAdditions} additions</span>`
+                : ""
+            }
+            ${
+              totalDeletions > 0
+                ? `<span class="stat-deletions">-${totalDeletions} deletions</span>`
+                : ""
+            }
+          </div>
+        `;
+      }
 
-      html += `<div class="commit-diff">${formattedDiff}</div>`;
+      // If no body, show a helpful message
+      if (!body && (totalAdditions > 0 || totalDeletions > 0)) {
+        html =
+          `
+          <div class="commit-meta-mini">
+            <i class="codicon codicon-git-commit"></i> 
+            <code>${commitHash.slice(0, 7)}</code>
+            ${date ? ` · ${date}` : ""}
+          </div>
+        ` + html;
+      } else if (!body && !numstat) {
+        html = '<div class="no-details">No additional commit message</div>';
+      }
+
+      // Action button to view full diff in VS Code
+      html += `
+        <div class="commit-actions">
+          <button class="action-btn" onclick="viewCommit('${commitHash}')">
+            <i class="codicon codicon-diff"></i> View Full Diff in VS Code
+          </button>
+        </div>
+      `;
 
       return html;
     } catch {
       return '<div class="error-msg"><i class="codicon codicon-error"></i> Could not load commit details</div>';
     }
+  }
+
+  /**
+   * Format commit body with markdown-like styling
+   */
+  private formatCommitBody(body: string): string {
+    let html = this.escapeHtml(body);
+
+    // Convert bullet points
+    html = html.replace(/^[-*]\s+(.+)$/gm, "<li>$1</li>");
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, "<ul>$&</ul>");
+
+    // Convert numbered lists
+    html = html.replace(/^\d+\.\s+(.+)$/gm, "<li>$1</li>");
+
+    // Convert line breaks
+    html = html.replace(/\n\n/g, "</p><p>");
+    html = html.replace(/\n/g, "<br>");
+
+    // Wrap in paragraph if not already wrapped
+    if (!html.startsWith("<")) {
+      html = `<p>${html}</p>`;
+    }
+
+    return html;
   }
 
   /**
@@ -3244,53 +3668,29 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // Get file content before the commit (from parent)
-      let beforeContent = "";
-      try {
-        beforeContent = execSync(`git show ${parentHash}:"${filePath}"`, {
-          cwd: this.workspacePath,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-      } catch {
-        // File didn't exist before this commit (new file)
-        beforeContent = "";
-      }
+      // Use VS Code's git scheme for proper diff viewing
+      const fileUri = vscode.Uri.file(`${this.workspacePath}/${filePath}`);
 
-      // Get file content after the commit
-      let afterContent = "";
-      try {
-        afterContent = execSync(`git show ${commitHash}:"${filePath}"`, {
-          cwd: this.workspacePath,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-      } catch {
-        // File was deleted in this commit
-        afterContent = "";
-      }
+      // Create git URIs with the ref in the query string (VS Code Git extension format)
+      const beforeUri = fileUri.with({
+        scheme: "git",
+        query: JSON.stringify({ path: fileUri.fsPath, ref: parentHash }),
+      });
+      const afterUri = fileUri.with({
+        scheme: "git",
+        query: JSON.stringify({ path: fileUri.fsPath, ref: commitHash }),
+      });
 
-      // Create virtual documents for the diff
-      const beforeUri = vscode.Uri.parse(
-        `gitspectra-diff:${parentHash.slice(0, 7)}/${filePath}`
-      );
-      const afterUri = vscode.Uri.parse(
-        `gitspectra-diff:${commitHash.slice(0, 7)}/${filePath}`
-      );
+      const fileName = filePath.split("/").pop() || filePath;
+      const shortParent = parentHash.slice(0, 7);
+      const shortCommit = commitHash.slice(0, 7);
 
-      // Store content in cache (used by DiffContentProvider in extension.ts)
-      this.diffContentCache.set(beforeUri.toString(), beforeContent);
-      this.diffContentCache.set(afterUri.toString(), afterContent);
-
-      // Send message to extension to open diff
-      vscode.commands.executeCommand(
-        "gitspectra.openCommitDiff",
+      // Open diff using VS Code's built-in diff command
+      await vscode.commands.executeCommand(
+        "vscode.diff",
         beforeUri,
         afterUri,
-        `${filePath.split("/").pop()} (${parentHash.slice(
-          0,
-          7
-        )} → ${commitHash.slice(0, 7)})`
+        `${fileName} (${shortParent} → ${shortCommit})`
       );
     } catch (err) {
       vscode.window.showErrorMessage(`Could not show file diff: ${err}`);

@@ -53,6 +53,9 @@ export class DemoOrchestrator {
   private decorationProvider?: ConflictDecorationProvider;
   private statusBarProvider?: StatusBarProvider;
   private workspacePath: string = '';
+  
+  // Cache of real files found in the workspace for demo
+  private realWorkspaceFiles: string[] = [];
 
   // Callback to update conflict cache in extension.ts
   private onConflictInjected?: (file: string, report: FileConflictReport) => void;
