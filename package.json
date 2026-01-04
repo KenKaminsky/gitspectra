@@ -2,7 +2,7 @@
   "name": "gitspectra",
   "displayName": "GitSpectra",
   "description": "See the full spectrum of your Git. Local-only conflict detection for VS Code. No cloud. No tracking. Just Git.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "gitspectra",
   "license": "AGPL-3.0-only",
   "icon": "images/icon.png",
@@ -180,7 +180,9 @@
           "items": {
             "type": "string"
           },
-          "default": ["origin/main"],
+          "default": [
+            "origin/main"
+          ],
           "description": "Branches to check for conflicts against"
         },
         "gitspectra.scope.excludeBranches": {
@@ -188,7 +190,10 @@
           "items": {
             "type": "string"
           },
-          "default": ["origin/dependabot/*", "origin/renovate/*"],
+          "default": [
+            "origin/dependabot/*",
+            "origin/renovate/*"
+          ],
           "description": "Branch patterns to exclude from conflict checking"
         },
         "gitspectra.scope.authors": {
