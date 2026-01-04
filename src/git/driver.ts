@@ -357,6 +357,26 @@ export class GitDriver {
   }
 
   /**
+   * Get diff between two commits/refs for a specific file
+   * This shows what changed FROM ref1 TO ref2
+   */
+  async diffBetween(
+    fromRef: string,
+    toRef: string,
+    file: string
+  ): Promise<DiffHunk[]> {
+    try {
+      const args = ["diff", `${fromRef}...${toRef}`, "--", file];
+      const output = await this.execute(args);
+      const result = this.parseDiff(output);
+      return result.files[0]?.hunks || [];
+    } catch {
+      // File might not exist in one of the refs
+      return [];
+    }
+  }
+
+  /**
    * Parse unified diff output
    */
   private parseDiff(output: string): DiffResult {
@@ -440,6 +460,18 @@ export class GitDriver {
    */
   async showFile(ref: string, file: string): Promise<string> {
     return await this.execute(["show", `${ref}:${file}`]);
+  }
+
+  /**
+   * Check if a file exists in a specific branch/ref
+   */
+  async fileExistsInBranch(ref: string, file: string): Promise<boolean> {
+    try {
+      await this.execute(["cat-file", "-e", `${ref}:${file}`]);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**

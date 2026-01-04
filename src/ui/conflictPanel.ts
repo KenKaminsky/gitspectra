@@ -475,6 +475,20 @@ export class ConflictPanelProvider
   }
 
   /**
+   * Update git driver (when switching repos)
+   */
+  setGitDriver(git: GitDriver): void {
+    this.git = git;
+  }
+
+  /**
+   * Update workspace path (when switching repos)
+   */
+  setWorkspacePath(workspacePath: string): void {
+    this.workspacePath = workspacePath;
+  }
+
+  /**
    * Dispose
    */
   dispose(): void {

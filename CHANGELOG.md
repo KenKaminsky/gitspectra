@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-01-04
+
+### Added
+
+- **Activity Feed Enhancements**
+  - Inline commit details expansion with file list
+  - View individual file diffs from commit details
+  - Open commits and branches on GitHub directly
+  - Improved commit navigation and exploration
+
+- **Diff View Improvements**
+  - Better handling of renamed/moved files
+  - Graceful fallback when local file no longer exists
+  - Show remote-only version when file was deleted locally
+
+### Fixed
+
+- **Multi-repo workspace improvements**: Better context switching when navigating between different git repositories in the same workspace
+- **File existence checks**: Graceful handling when opening files that have been renamed or deleted
+- **Conflict panel refresh**: Proper refresh when switching between repositories
+
+### Changed
+
+- Improved conflict detection algorithm documentation (added `docs/ALGORITHM.md`)
+
 ## [0.1.2] - 2026-01-04
 
 ### Fixed
@@ -65,5 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/KenKaminsky/gitspectra/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/KenKaminsky/gitspectra/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/KenKaminsky/gitspectra/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/KenKaminsky/gitspectra/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/KenKaminsky/gitspectra/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/KenKaminsky/gitspectra/releases/tag/v0.1.0

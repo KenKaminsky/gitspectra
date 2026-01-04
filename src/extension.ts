@@ -130,11 +130,18 @@ async function switchToRepo(context: vscode.ExtensionContext, newRepoRoot: strin
     statusBarProvider.setConfig(config);
   }
   if (conflictPanelProvider) {
-    conflictPanelProvider = new ConflictPanelProvider(gitDriver, config, workspaceRoot);
+    conflictPanelProvider.setGitDriver(gitDriver);
+    conflictPanelProvider.setWorkspacePath(workspaceRoot);
+    conflictPanelProvider.setConfig(config);
+    // Refresh to rebuild tree items with new paths
+    conflictPanelProvider.refresh();
   }
   if (activityFeedProvider) {
     activityFeedProvider.setWorkspacePath(workspaceRoot);
+    activityFeedProvider.setGitDriver(gitDriver);
     activityFeedProvider.setConfig(config);
+    // Refresh with new repo data
+    activityFeedProvider.refresh();
   }
   
   // Clear old conflict cache
@@ -425,6 +432,22 @@ function registerCommands(context: vscode.ExtensionContext): void {
     ),
 
     vscode.commands.registerCommand(
+      "gitspectra.openCommitDiff",
+      async (beforeUri: vscode.Uri, afterUri: vscode.Uri, title: string) => {
+        // Get content from activity feed provider
+        const beforeContent = activityFeedProvider?.getDiffContent(beforeUri.toString()) || "";
+        const afterContent = activityFeedProvider?.getDiffContent(afterUri.toString()) || "";
+
+        // Store in diff cache
+        diffContentCache.set(beforeUri.toString(), beforeContent);
+        diffContentCache.set(afterUri.toString(), afterContent);
+
+        // Open the diff editor
+        await vscode.commands.executeCommand("vscode.diff", beforeUri, afterUri, title);
+      }
+    ),
+
+    vscode.commands.registerCommand(
       "gitspectra.dismissConflict",
       (args: { file: string; line: number }) => {
         log("Command", `Dismiss conflict at line ${args.line} in ${args.file}`);
@@ -630,17 +653,50 @@ async function openDiffView(filePath: string, branch: string): Promise<void> {
   log("Diff", `Opening diff for ${filePath} against ${branch}`);
   
   try {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    // Use the current repo's workspace root (not the first workspace folder)
     if (!workspaceRoot) {
-      vscode.window.showErrorMessage("No workspace folder open");
+      vscode.window.showErrorMessage("No git repository detected");
       return;
     }
 
-    // Get relative path for Git
+    // Get absolute and relative paths for the current repo
     const absolutePath = filePath.startsWith("/") ? filePath : `${workspaceRoot}/${filePath}`;
     const relativePath = absolutePath.startsWith(workspaceRoot)
       ? absolutePath.slice(workspaceRoot.length + 1)
       : filePath;
+
+    // Check if local file exists
+    const fs = await import("fs");
+    const localFileExists = fs.existsSync(absolutePath);
+    
+    if (!localFileExists) {
+      // File was likely renamed/moved - show helpful message
+      const fileName = relativePath.split("/").pop() || relativePath;
+      log("Diff", `Local file not found: ${absolutePath}`);
+      
+      // Try to show just the remote version
+      try {
+        const remoteContent = await gitDriver.showFile(branch, relativePath);
+        if (remoteContent) {
+          const remoteUri = vscode.Uri.parse(`gitspectra-diff:${branch}/${relativePath}`);
+          diffContentCache.set(remoteUri.toString(), remoteContent);
+          
+          // Open just the remote file (no local to compare)
+          await vscode.commands.executeCommand("vscode.open", remoteUri);
+          vscode.window.showWarningMessage(
+            `File "${fileName}" was renamed or moved. Showing version from ${branch.replace("origin/", "")}.`
+          );
+          return;
+        }
+      } catch {
+        // File doesn't exist in remote either
+      }
+      
+      vscode.window.showErrorMessage(
+        `File "${fileName}" no longer exists at this path. It may have been renamed or deleted.`
+      );
+      return;
+    }
 
     // Create local file URI
     const localUri = vscode.Uri.file(absolutePath);

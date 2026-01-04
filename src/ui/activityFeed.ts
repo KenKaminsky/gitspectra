@@ -45,6 +45,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   // Activity data
   private activities: ActivityItem[] = [];
   private yourRecentFiles: Set<string> = new Set();
+  private yourEmail: string | null = null;
 
   // Filters
   private filterAuthor: string | null = null;
@@ -118,14 +119,54 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
           });
           break;
         case "openFile": {
-          const uri = vscode.Uri.file(`${this.workspacePath}/${data.file}`);
-          vscode.commands.executeCommand("vscode.open", uri);
+          const filePath = `${this.workspacePath}/${data.file}`;
+          const fs = require("fs");
+          if (fs.existsSync(filePath)) {
+            const uri = vscode.Uri.file(filePath);
+            vscode.commands.executeCommand("vscode.open", uri);
+          } else {
+            const fileName = data.file.split("/").pop() || data.file;
+            vscode.window.showWarningMessage(
+              `File "${fileName}" no longer exists at this path. It may have been renamed or moved.`
+            );
+          }
           break;
         }
         case "pullLatest": {
           const terminal = vscode.window.createTerminal("GitSpectra");
           terminal.show();
           terminal.sendText("git pull");
+          break;
+        }
+        case "viewCommit": {
+          // Open commit diff in VS Code
+          await this.openCommitDiff(data.commit);
+          break;
+        }
+        case "getCommitDetails": {
+          // Get full commit details for inline expansion
+          const details = await this.getCommitDetails(data.commit);
+          if (this._view) {
+            this._view.webview.postMessage({
+              type: "commitDetails",
+              commit: data.commit,
+              details,
+            });
+          }
+          break;
+        }
+        case "viewCommitFileDiff": {
+          // View specific file diff for a commit
+          await this.openCommitFileDiff(data.commit, data.file);
+          break;
+        }
+        case "openCommitOnGitHub": {
+          // Try to open commit on GitHub
+          this.openOnGitHub("commit", data.commit);
+          break;
+        }
+        case "openBranchOnGitHub": {
+          this.openOnGitHub("branch", data.branch);
           break;
         }
       }
@@ -165,11 +206,11 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
     try {
       // Get your commits from the last 7 days
-      const yourEmail = await this.getYourEmail();
-      if (!yourEmail) return;
+      this.yourEmail = await this.getYourEmail();
+      if (!this.yourEmail) return;
 
       const commits = await this.git.log({
-        author: yourEmail,
+        author: this.yourEmail,
         since: "7 days ago",
         maxCount: 100,
       });
@@ -499,14 +540,72 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             vscode.postMessage({ type: 'openFile', file });
           }
           
+          function viewCommit(commit) {
+            vscode.postMessage({ type: 'viewCommit', commit });
+          }
+          
+          function openCommitOnGitHub(commit) {
+            vscode.postMessage({ type: 'openCommitOnGitHub', commit });
+          }
+          
+          function openBranchOnGitHub(branch) {
+            vscode.postMessage({ type: 'openBranchOnGitHub', branch });
+          }
+          
+          function toggleCommitDetails(commit) {
+            const detailsEl = document.getElementById('details-' + commit);
+            const iconEl = document.getElementById('details-icon-' + commit);
+            const textEl = document.getElementById('details-text-' + commit);
+            if (detailsEl) {
+              if (detailsEl.style.display === 'none') {
+                detailsEl.style.display = 'block';
+                if (iconEl) {
+                  iconEl.className = 'codicon codicon-fold';
+                }
+                if (textEl) {
+                  textEl.textContent = 'Show less';
+                }
+                // Request details from extension
+                vscode.postMessage({ type: 'getCommitDetails', commit });
+              } else {
+                detailsEl.style.display = 'none';
+                if (iconEl) {
+                  iconEl.className = 'codicon codicon-unfold';
+                }
+                if (textEl) {
+                  textEl.textContent = 'Show more';
+                }
+              }
+            }
+          }
+          
+          function viewCommitFileDiff(commit, file) {
+            vscode.postMessage({ type: 'viewCommitFileDiff', commit, file });
+          }
+          
+          // Handle messages from extension
+          window.addEventListener('message', event => {
+            const message = event.data;
+            if (message.type === 'commitDetails') {
+              const contentEl = document.getElementById('details-content-' + message.commit);
+              if (contentEl) {
+                contentEl.innerHTML = message.details;
+              }
+            }
+          });
+          
           function pullLatest() {
             vscode.postMessage({ type: 'pullLatest' });
           }
           
           function toggleFiles(id) {
             const el = document.getElementById('files-' + id);
+            const icon = document.getElementById('expand-icon-' + id);
             if (el) {
               el.classList.toggle('expanded');
+              if (icon) {
+                icon.classList.toggle('rotated');
+              }
             }
           }
           
@@ -821,7 +920,195 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       .time-ago {
         color: var(--vscode-descriptionForeground);
         font-size: 11px;
+      }
+      
+      .activity-quick-actions {
+        display: flex;
+        gap: 4px;
         margin-left: auto;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      
+      .activity-item:hover .activity-quick-actions {
+        opacity: 1;
+      }
+      
+      .icon-btn-tiny {
+        background: transparent;
+        border: none;
+        color: var(--vscode-descriptionForeground);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-size: 12px;
+      }
+      
+      .icon-btn-tiny:hover {
+        background: var(--vscode-toolbar-hoverBackground);
+        color: var(--vscode-foreground);
+      }
+      
+      .commit-details-toggle {
+        margin: 4px 0;
+      }
+      
+      .details-btn {
+        background: var(--vscode-button-secondaryBackground);
+        border: none;
+        color: var(--vscode-button-secondaryForeground);
+        cursor: pointer;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s;
+      }
+      
+      .details-btn:hover {
+        background: var(--vscode-button-secondaryHoverBackground);
+      }
+      
+      .details-btn .codicon {
+        font-size: 14px;
+      }
+      
+      .commit-details {
+        background: var(--vscode-textBlockQuote-background);
+        border-radius: 4px;
+        padding: 8px;
+        margin: 6px 0;
+        border-left: 2px solid var(--vscode-textLink-foreground);
+      }
+      
+      .details-content {
+        font-family: var(--vscode-editor-font-family);
+        font-size: 11px;
+        margin: 0;
+        color: var(--vscode-foreground);
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      
+      .loading-spinner {
+        color: var(--vscode-descriptionForeground);
+        padding: 8px;
+      }
+      
+      .commit-meta {
+        margin-bottom: 8px;
+        color: var(--vscode-descriptionForeground);
+      }
+      
+      .meta-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 2px;
+        font-size: 11px;
+      }
+      
+      .meta-row strong {
+        color: var(--vscode-foreground);
+      }
+      
+      .commit-subject {
+        font-weight: 600;
+        color: var(--vscode-foreground);
+        margin-bottom: 6px;
+        font-size: 12px;
+      }
+      
+      .commit-body {
+        color: var(--vscode-descriptionForeground);
+        font-size: 11px;
+        margin-bottom: 8px;
+        padding: 6px;
+        background: var(--vscode-editor-background);
+        border-radius: 4px;
+        line-height: 1.4;
+      }
+      
+      .commit-stats-summary {
+        font-size: 10px;
+        color: var(--vscode-descriptionForeground);
+        margin-bottom: 8px;
+        padding: 4px 8px;
+        background: var(--vscode-badge-background);
+        border-radius: 4px;
+        display: inline-block;
+      }
+      
+      .commit-diff {
+        margin-top: 8px;
+      }
+      
+      .diff-content {
+        font-family: var(--vscode-editor-font-family);
+        font-size: 11px;
+        line-height: 1.4;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      
+      .diff-file-separator {
+        background: var(--vscode-editor-background);
+        color: var(--vscode-descriptionForeground);
+        padding: 4px 8px;
+        margin-top: 8px;
+        font-weight: 600;
+        border-bottom: 1px solid var(--vscode-widget-border);
+      }
+      
+      .diff-file-header {
+        color: var(--vscode-descriptionForeground);
+        padding: 2px 8px;
+        font-style: italic;
+      }
+      
+      .diff-hunk-header {
+        background: var(--vscode-diffEditor-insertedLineBackground);
+        color: var(--vscode-textLink-foreground);
+        padding: 2px 8px;
+        margin-top: 4px;
+        opacity: 0.8;
+      }
+      
+      .diff-add {
+        background: rgba(35, 134, 54, 0.25);
+        color: #3fb950;
+        padding: 0 8px;
+      }
+      
+      .diff-remove {
+        background: rgba(248, 81, 73, 0.2);
+        color: #f85149;
+        padding: 0 8px;
+      }
+      
+      .diff-context {
+        color: var(--vscode-descriptionForeground);
+        padding: 0 8px;
+      }
+      
+      .error-msg {
+        color: var(--vscode-errorForeground);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      
+      .expand-icon {
+        margin-left: auto;
+        opacity: 0.6;
+        font-size: 10px;
+        transition: transform 0.2s;
+      }
+      
+      .expand-icon.rotated {
+        transform: rotate(180deg);
       }
       
       .commit-message {
@@ -1025,22 +1312,26 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       }
       
       .diff-btn-small {
-        padding: 1px 4px;
-        background: transparent;
-        border: 1px solid var(--vscode-panel-border);
-        color: var(--vscode-descriptionForeground);
-        border-radius: 3px;
+        padding: 3px 6px;
+        background: var(--vscode-button-secondaryBackground);
+        border: none;
+        color: var(--vscode-button-secondaryForeground);
+        border-radius: 4px;
         cursor: pointer;
-        opacity: 0.6;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        margin-left: 4px;
+        transition: background 0.15s;
       }
       
       .diff-btn-small:hover {
-        opacity: 1;
-        background: var(--vscode-button-secondaryBackground);
+        background: var(--vscode-button-secondaryHoverBackground);
+      }
+      
+      .diff-btn-small .codicon {
+        font-size: 14px;
       }
       
       .diff-btn-small .codicon {
@@ -1184,11 +1475,16 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       }
       
       .you-badge-small {
-        background: var(--vscode-charts-orange);
-        color: white;
-        padding: 0 4px;
-        border-radius: 6px;
-        font-size: 8px;
+        background: var(--vscode-inputValidation-warningBackground);
+        color: var(--vscode-inputValidation-warningForeground);
+        border: 1px solid var(--vscode-inputValidation-warningBorder);
+        padding: 1px 6px;
+        border-radius: 8px;
+        font-size: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        margin-left: 4px;
         font-weight: 600;
         flex-shrink: 0;
       }
@@ -1945,7 +2241,13 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   private renderActivityItem(activity: ActivityItem): string {
     const avatarUrl = this.getGravatarUrl(activity.email);
     const timeAgo = this.formatTimeAgo(activity.date);
-    const hasOverlap = activity.files.some((f) => f.youAlsoTouched);
+    const isYourCommit = Boolean(
+      this.yourEmail &&
+        activity.email.toLowerCase() === this.yourEmail.toLowerCase()
+    );
+    // Only show overlap warning if it's someone else's commit touching your files
+    const hasOverlap =
+      !isYourCommit && activity.files.some((f) => f.youAlsoTouched);
     const hasConflict = activity.files.some((f) => f.hasConflict);
     const isMainBranch = this.mainBranches.has(activity.branch);
     const isLongMessage = activity.message.length > 80;
@@ -1977,6 +2279,18 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
                 : ""
             }
             <span class="time-ago">${timeAgo}</span>
+            <div class="activity-quick-actions">
+              <button class="icon-btn-tiny" onclick="event.stopPropagation(); viewCommit('${
+                activity.id
+              }')" title="View commit changes">
+                <i class="codicon codicon-git-commit"></i>
+              </button>
+              <button class="icon-btn-tiny" onclick="event.stopPropagation(); openCommitOnGitHub('${
+                activity.id
+              }')" title="Open on GitHub">
+                <i class="codicon codicon-github"></i>
+              </button>
+            </div>
           </div>
           <div class="commit-message ${
             isLongMessage ? "truncated" : ""
@@ -1990,6 +2304,22 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
                 : ""
             }
           </div>
+          <div class="commit-details-toggle">
+            <button class="details-btn" id="details-btn-${
+              activity.id
+            }" onclick="event.stopPropagation(); toggleCommitDetails('${
+      activity.id
+    }')">
+              <span id="details-text-${activity.id}">Show more</span>
+            </button>
+          </div>
+          <div class="commit-details" id="details-${
+            activity.id
+          }" style="display: none;">
+            <div class="details-content" id="details-content-${
+              activity.id
+            }"><div class="loading-spinner"><i class="codicon codicon-loading codicon-modifier-spin"></i> Loading...</div></div>
+          </div>
           ${
             activity.files.length > 0
               ? `
@@ -2000,10 +2330,12 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
                 }</span>
               ${
                 hasOverlap
-                  ? '<span class="you-badge"><i class="codicon codicon-warning"></i> You</span>'
+                  ? '<span class="you-badge"><i class="codicon codicon-warning"></i> Overlap</span>'
                   : ""
               }
-              <span class="expand-arrow">▾</span>
+              <i class="codicon codicon-triangle-down expand-icon" id="expand-icon-${
+                activity.id
+              }"></i>
             </div>
             <div class="files-list" id="files-${activity.id}">
               <div class="files-view-toggle" onclick="event.stopPropagation()">
@@ -2021,7 +2353,9 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
               ${this.renderFileList(
                 activity.files.slice(0, initialFiles),
                 activity.branch,
-                this.fileViewMode
+                this.fileViewMode,
+                activity.id,
+                isYourCommit
               )}
               ${
                 hasMoreFiles
@@ -2030,18 +2364,20 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
                   ${this.renderFileList(
                     activity.files.slice(initialFiles),
                     activity.branch,
-                    this.fileViewMode
+                    this.fileViewMode,
+                    activity.id,
+                    isYourCommit
                   )}
                 </div>
                 <button class="show-more-btn" id="morebtn-${shortId}" onclick="event.stopPropagation(); showMoreFiles('${shortId}', ${
                       activity.files.length - initialFiles
                     })">
-                  <i class="codicon codicon-chevron-down"></i> Show ${
+                  <i class="codicon codicon-fold-down"></i> Show ${
                     activity.files.length - initialFiles
                   } more files
                 </button>
                 <button class="show-more-btn" id="lessbtn-${shortId}" style="display: none;" onclick="event.stopPropagation(); showLessFiles('${shortId}')">
-                  <i class="codicon codicon-chevron-up"></i> Show less
+                  <i class="codicon codicon-fold-up"></i> Show less
                 </button>
               `
                   : ""
@@ -2061,38 +2397,40 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   private renderFileList(
     files: ActivityFile[],
     branch: string,
-    mode: "list" | "tree"
+    mode: "list" | "tree",
+    commitHash: string,
+    isYourCommit: boolean = false
   ): string {
     if (mode === "tree") {
-      return this.renderFileTree(files, branch);
+      return this.renderFileTree(files, branch, commitHash, isYourCommit);
     }
 
     return files
       .map((file) => {
         const fileName = file.path.split("/").pop() || file.path;
         const fileIcon = this.getFileIcon(fileName);
-        // Simulate lines added/removed
-        const additions = Math.floor(Math.random() * 50);
-        const deletions = Math.floor(Math.random() * 20);
+        // Show overlap only if not your commit
+        const showOverlap = !isYourCommit && file.youAlsoTouched;
 
         return `
-        <div class="list-file-row ${file.youAlsoTouched ? "you-touched" : ""}">
+        <div class="list-file-row ${showOverlap ? "you-touched" : ""}">
           <i class="codicon codicon-${fileIcon} list-file-icon"></i>
           <span class="list-file-path" onclick="event.stopPropagation(); openFile('${
             file.path
           }')">${file.path}</span>
-          <span class="list-file-changes">
-            <span class="additions">+${additions}</span>
-            <span class="deletions">-${deletions}</span>
-          </span>
           ${
-            file.youAlsoTouched
-              ? '<span class="you-badge-small">You</span>'
+            showOverlap
+              ? '<span class="you-badge-small"><i class="codicon codicon-warning"></i> Overlap</span>'
               : ""
           }
-          <button class="diff-btn-small" onclick="event.stopPropagation(); viewDiff('${
+          <button class="diff-btn-small commit-diff-btn" onclick="event.stopPropagation(); viewCommitFileDiff('${commitHash}', '${
+          file.path
+        }')" title="View what changed in this commit">
+            <i class="codicon codicon-git-commit"></i>
+          </button>
+          <button class="diff-btn-small local-diff-btn" onclick="event.stopPropagation(); viewDiff('${
             file.path
-          }', 'origin/${branch}')" title="View Diff">
+          }', 'origin/${branch}')" title="Compare with your local version">
             <i class="codicon codicon-git-compare"></i>
           </button>
         </div>
@@ -2104,7 +2442,12 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   /**
    * Render files as a tree
    */
-  private renderFileTree(files: ActivityFile[], branch: string): string {
+  private renderFileTree(
+    files: ActivityFile[],
+    branch: string,
+    commitHash: string,
+    isYourCommit: boolean
+  ): string {
     // Build tree structure
     const tree: Record<string, any> = {};
 
@@ -2127,7 +2470,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    return this.renderTreeNode(tree, branch, 0);
+    return this.renderTreeNode(tree, branch, 0, "", commitHash, isYourCommit);
   }
 
   /**
@@ -2171,7 +2514,9 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     node: Record<string, any>,
     branch: string,
     depth: number,
-    parentId: string = ""
+    parentId: string = "",
+    commitHash: string = "",
+    isYourCommit: boolean = false
   ): string {
     let html = "";
     const indent = depth * 16;
@@ -2189,30 +2534,30 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         // It's a file
         const file = value.__file as ActivityFile;
         const fileIcon = this.getFileIcon(name);
-        // Simulate lines added/removed (in real implementation, get from git)
-        const additions = Math.floor(Math.random() * 50);
-        const deletions = Math.floor(Math.random() * 20);
+        // Show overlap only if not your commit
+        const showOverlap = !isYourCommit && file.youAlsoTouched;
 
         html += `
           <div class="tree-row file-row ${
-            file.youAlsoTouched ? "you-touched" : ""
+            showOverlap ? "you-touched" : ""
           }" style="padding-left: ${indent + 20}px">
             <i class="codicon codicon-${fileIcon} tree-file-icon"></i>
             <span class="tree-label file-label" onclick="event.stopPropagation(); openFile('${
               file.path
             }')">${name}</span>
-            <span class="tree-changes">
-              <span class="additions">+${additions}</span>
-              <span class="deletions">-${deletions}</span>
-            </span>
             ${
-              file.youAlsoTouched
-                ? '<span class="you-badge-small">You</span>'
+              showOverlap
+                ? '<span class="you-badge-small"><i class="codicon codicon-warning"></i> Overlap</span>'
                 : ""
             }
-            <button class="diff-btn-small" onclick="event.stopPropagation(); viewDiff('${
+            <button class="diff-btn-small commit-diff-btn" onclick="event.stopPropagation(); viewCommitFileDiff('${commitHash}', '${
+          file.path
+        }')" title="View what changed in this commit">
+              <i class="codicon codicon-git-commit"></i>
+            </button>
+            <button class="diff-btn-small local-diff-btn" onclick="event.stopPropagation(); viewDiff('${
               file.path
-            }', 'origin/${branch}')" title="View Diff">
+            }', 'origin/${branch}')" title="Compare with your local version">
               <i class="codicon codicon-git-compare"></i>
             </button>
           </div>
@@ -2227,13 +2572,20 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
         html += `
           <div class="tree-row folder-row" style="padding-left: ${indent}px" onclick="toggleFolder('${folderId}')">
-            <i class="codicon codicon-chevron-down folder-chevron" id="chevron-${folderId}"></i>
+            <i class="codicon codicon-triangle-down folder-chevron" id="chevron-${folderId}"></i>
             <i class="codicon codicon-folder-opened folder-icon" id="folder-icon-${folderId}"></i>
             <span class="tree-label folder-label">${name}</span>
             <span class="tree-count">${childCount}</span>
           </div>
           <div class="folder-contents" id="${folderId}">
-            ${this.renderTreeNode(value, branch, depth + 1, folderId)}
+            ${this.renderTreeNode(
+              value,
+              branch,
+              depth + 1,
+              folderId,
+              commitHash,
+              isYourCommit
+            )}
           </div>
         `;
       }
@@ -2599,5 +2951,316 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
   setWorkspacePath(workspacePath: string): void {
     this.workspacePath = workspacePath;
+    // Clear cached data for new repo
+    this.activities = [];
+    this.yourRecentFiles.clear();
+  }
+
+  setGitDriver(gitDriver: GitDriver): void {
+    this.git = gitDriver;
+  }
+
+  /**
+   * Open commit diff in VS Code's diff editor
+   */
+  private async openCommitDiff(commitHash: string): Promise<void> {
+    try {
+      const { execSync } = require("child_process");
+
+      // Get the list of changed files in this commit
+      const files = execSync(
+        `git diff-tree --no-commit-id --name-only -r ${commitHash}`,
+        {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+        }
+      )
+        .trim()
+        .split("\n")
+        .filter(Boolean);
+
+      if (files.length === 0) {
+        vscode.window.showInformationMessage("No file changes in this commit");
+        return;
+      }
+
+      // Show quick pick for files
+      interface FileQuickPickItem extends vscode.QuickPickItem {
+        file: string;
+      }
+      const fileItems: FileQuickPickItem[] = files.map((f: string) => ({
+        label: f.split("/").pop() || f,
+        description: f,
+        file: f,
+      }));
+
+      const selected = await vscode.window.showQuickPick(fileItems, {
+        placeHolder: `Select file to view diff (${files.length} files changed in this commit)`,
+      });
+
+      if (selected) {
+        // Show the diff in an output channel with syntax highlighting
+        const diff = execSync(`git show ${commitHash} -- "${selected.file}"`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+        });
+
+        const outputChannel = vscode.window.createOutputChannel(
+          `GitSpectra: ${selected.label}`
+        );
+        outputChannel.clear();
+        outputChannel.append(diff);
+        outputChannel.show();
+      }
+    } catch (err) {
+      vscode.window.showErrorMessage(`Could not open commit diff: ${err}`);
+    }
+  }
+
+  /**
+   * Get full commit details for inline display (returns HTML)
+   */
+  private async getCommitDetails(commitHash: string): Promise<string> {
+    try {
+      const { execSync } = require("child_process");
+
+      // Get commit metadata using safer format
+      const meta = execSync(
+        `git log -1 --format="%an|||%ae|||%ar|||%s" ${commitHash}`,
+        {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        }
+      ).trim();
+      const [author, email, date, subject] = meta.split("|||");
+
+      // Get full commit message (body)
+      let body = "";
+      try {
+        body = execSync(`git log -1 --format="%b" ${commitHash}`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
+      } catch {
+        // Ignore body errors
+      }
+
+      // Get file stats
+      let stats = "";
+      try {
+        stats = execSync(`git diff-tree --stat --no-commit-id ${commitHash}`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
+      } catch {
+        // Ignore stats errors
+      }
+
+      // Get diff
+      let diff = "";
+      try {
+        diff = execSync(`git diff-tree -p --no-commit-id ${commitHash}`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+          maxBuffer: 1024 * 1024 * 5, // 5MB
+        });
+      } catch {
+        // Ignore diff errors
+      }
+
+      // Format diff with HTML colors
+      const formattedDiff = this.formatDiffAsHtml(diff);
+
+      // Build HTML
+      let html = `
+        <div class="commit-meta">
+          <div class="meta-row"><i class="codicon codicon-person"></i> <strong>${this.escapeHtml(
+            author
+          )}</strong> &lt;${this.escapeHtml(email)}&gt;</div>
+          <div class="meta-row"><i class="codicon codicon-clock"></i> ${this.escapeHtml(
+            date
+          )}</div>
+        </div>
+        <div class="commit-subject">${this.escapeHtml(subject)}</div>
+      `;
+
+      if (body) {
+        html += `<div class="commit-body">${this.escapeHtml(body).replace(
+          /\n/g,
+          "<br>"
+        )}</div>`;
+      }
+
+      // Stats summary
+      const statsLines = stats.split("\n").filter((l: string) => l.trim());
+      const summaryLine = statsLines[statsLines.length - 1] || "";
+      html += `<div class="commit-stats-summary">${this.escapeHtml(
+        summaryLine
+      )}</div>`;
+
+      html += `<div class="commit-diff">${formattedDiff}</div>`;
+
+      return html;
+    } catch {
+      return '<div class="error-msg"><i class="codicon codicon-error"></i> Could not load commit details</div>';
+    }
+  }
+
+  /**
+   * Format git diff output as HTML with colors
+   */
+  private formatDiffAsHtml(diff: string): string {
+    const lines = diff.split("\n");
+    let html = '<div class="diff-content">';
+
+    for (const line of lines) {
+      const escaped = this.escapeHtml(line);
+
+      if (line.startsWith("+++") || line.startsWith("---")) {
+        html += `<div class="diff-file-header">${escaped}</div>`;
+      } else if (line.startsWith("@@")) {
+        html += `<div class="diff-hunk-header">${escaped}</div>`;
+      } else if (line.startsWith("+")) {
+        html += `<div class="diff-add">${escaped}</div>`;
+      } else if (line.startsWith("-")) {
+        html += `<div class="diff-remove">${escaped}</div>`;
+      } else if (line.startsWith("diff --git")) {
+        html += `<div class="diff-file-separator">${escaped}</div>`;
+      } else {
+        html += `<div class="diff-context">${escaped}</div>`;
+      }
+    }
+
+    html += "</div>";
+    return html;
+  }
+
+  /**
+   * Open a specific file's diff for a commit in VS Code's diff editor
+   */
+  private async openCommitFileDiff(
+    commitHash: string,
+    filePath: string
+  ): Promise<void> {
+    try {
+      const { execSync } = require("child_process");
+
+      // Get parent commit hash
+      let parentHash: string;
+      try {
+        parentHash = execSync(`git rev-parse ${commitHash}^`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+        }).trim();
+      } catch {
+        // This is the initial commit, no parent
+        vscode.window.showInformationMessage(
+          "This is the initial commit - no previous version to compare"
+        );
+        return;
+      }
+
+      // Get file content before the commit (from parent)
+      let beforeContent = "";
+      try {
+        beforeContent = execSync(`git show ${parentHash}:"${filePath}"`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      } catch {
+        // File didn't exist before this commit (new file)
+        beforeContent = "";
+      }
+
+      // Get file content after the commit
+      let afterContent = "";
+      try {
+        afterContent = execSync(`git show ${commitHash}:"${filePath}"`, {
+          cwd: this.workspacePath,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      } catch {
+        // File was deleted in this commit
+        afterContent = "";
+      }
+
+      // Create virtual documents for the diff
+      const beforeUri = vscode.Uri.parse(
+        `gitspectra-diff:${parentHash.slice(0, 7)}/${filePath}`
+      );
+      const afterUri = vscode.Uri.parse(
+        `gitspectra-diff:${commitHash.slice(0, 7)}/${filePath}`
+      );
+
+      // Store content in cache (used by DiffContentProvider in extension.ts)
+      this.diffContentCache.set(beforeUri.toString(), beforeContent);
+      this.diffContentCache.set(afterUri.toString(), afterContent);
+
+      // Send message to extension to open diff
+      vscode.commands.executeCommand(
+        "gitspectra.openCommitDiff",
+        beforeUri,
+        afterUri,
+        `${filePath.split("/").pop()} (${parentHash.slice(
+          0,
+          7
+        )} → ${commitHash.slice(0, 7)})`
+      );
+    } catch (err) {
+      vscode.window.showErrorMessage(`Could not show file diff: ${err}`);
+    }
+  }
+
+  private diffContentCache = new Map<string, string>();
+
+  /**
+   * Get cached diff content (called from extension.ts)
+   */
+  public getDiffContent(uri: string): string {
+    return this.diffContentCache.get(uri) || "";
+  }
+
+  /**
+   * Open a commit or branch on GitHub
+   */
+  private async openOnGitHub(
+    type: "commit" | "branch",
+    ref: string
+  ): Promise<void> {
+    try {
+      // Get the remote URL
+      const { execSync } = require("child_process");
+      const remoteUrl = execSync("git remote get-url origin", {
+        cwd: this.workspacePath,
+        encoding: "utf-8",
+      }).trim();
+
+      // Convert git URL to GitHub web URL
+      let baseUrl = remoteUrl
+        .replace(/\.git$/, "")
+        .replace(/^git@github\.com:/, "https://github.com/")
+        .replace(/^ssh:\/\/git@github\.com\//, "https://github.com/");
+
+      let url: string;
+      if (type === "commit") {
+        url = `${baseUrl}/commit/${ref}`;
+      } else {
+        // Branch - remove origin/ prefix if present
+        const branchName = ref.replace(/^origin\//, "");
+        url = `${baseUrl}/tree/${branchName}`;
+      }
+
+      vscode.env.openExternal(vscode.Uri.parse(url));
+    } catch (err) {
+      vscode.window.showErrorMessage(
+        "Could not open on GitHub. Remote URL not configured or not a GitHub repo."
+      );
+    }
   }
 }

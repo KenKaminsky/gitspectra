@@ -281,7 +281,13 @@ export class ConflictDetector {
   }
 
   /**
-   * Check for changes near the lines being edited (soft warnings)
+   * Check for changes that OTHERS made (soft warnings)
+   * 
+   * Algorithm:
+   * 1. Find merge-base (common ancestor) between current branch and target
+   * 2. Get THEIR changes: lines changed in target branch since merge-base
+   * 3. Get YOUR changes: lines changed in your branch since merge-base
+   * 4. Only warn about THEIR changes that OVERLAP with YOUR changes
    */
   private async checkNearbyChanges(
     file: string,
@@ -290,16 +296,57 @@ export class ConflictDetector {
     const warnings: ConflictInfo[] = [];
 
     try {
-      const hunks = await this.git.diffFile(file, targetBranch);
+      // Skip files that don't exist in the target branch (new files)
+      const fileExistsInTarget = await this.git.fileExistsInBranch(targetBranch, file);
+      if (!fileExistsInTarget) {
+        // New file - no conflict possible since it doesn't exist in target
+        return [];
+      }
+
+      // Get the merge-base between current branch and target
+      const currentBranch = await this.git.getCurrentBranch();
+      const mergeBase = await this.git.getMergeBase(targetBranch, currentBranch);
+
+      // Get THEIR changes (what changed in target since merge-base)
+      const theirHunks = await this.git.diffBetween(mergeBase, targetBranch, file);
+      if (theirHunks.length === 0) {
+        // They didn't change this file since merge-base - no conflict possible
+        return [];
+      }
+
+      // Get YOUR changes (what changed in your branch since merge-base)
+      const yourHunks = await this.git.diffBetween(mergeBase, "HEAD", file);
+      const yourChangedLines = new Set<number>();
+      for (const hunk of yourHunks) {
+        const lines = this.parseHunkForChangedLines(hunk.content, hunk.newStart);
+        lines.forEach(line => yourChangedLines.add(line));
+      }
+
+      // Get commit info for their changes
       const commits = await this.getRelevantCommits(targetBranch, file);
       const latestCommit = commits[0];
 
-      for (const hunk of hunks) {
-        // Parse the hunk content to find actual changed lines
-        const changedLines = this.parseHunkForChangedLines(hunk.content, hunk.newStart);
+      // Only warn about THEIR changes that overlap with YOUR changes
+      for (const hunk of theirHunks) {
+        const theirChangedLines = this.parseHunkForChangedLines(hunk.content, hunk.newStart);
         
-        // Create a warning for each contiguous range of changed lines
-        const ranges = this.groupIntoRanges(changedLines);
+        // Find overlap between their changes and your changes
+        const overlappingLines = theirChangedLines.filter(line => {
+          // Check if this line or nearby lines were touched by you
+          // Use a small buffer (3 lines) to catch adjacent changes
+          for (let i = line - 3; i <= line + 3; i++) {
+            if (yourChangedLines.has(i)) return true;
+          }
+          return false;
+        });
+
+        if (overlappingLines.length === 0) {
+          // No overlap - their changes don't conflict with yours
+          continue;
+        }
+
+        // Create warnings for overlapping changes
+        const ranges = this.groupIntoRanges(overlappingLines);
         
         for (const range of ranges) {
           warnings.push({
@@ -318,7 +365,7 @@ export class ConflictDetector {
         }
       }
     } catch (error) {
-      // File might not exist in target branch
+      // File might not exist in target branch or other git errors
     }
 
     return warnings;
