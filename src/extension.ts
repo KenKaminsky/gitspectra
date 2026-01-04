@@ -30,39 +30,95 @@ let activityFeedProvider: ActivityFeedProvider;
 let fetchInterval: NodeJS.Timeout | null = null;
 let isInitialized = false;
 let workspaceRoot: string = "";
+let deferredActivationDisposable: vscode.Disposable | null = null;
 
 // Cache of conflict reports by file path
 const conflictCache = new Map<string, FileConflictReport>();
 
-export async function activate(context: vscode.ExtensionContext) {
-  log("Extension", "GitSpectra is activating...");
+/**
+ * Find the git root directory, checking active file first, then workspace folders
+ */
+async function findGitRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]): Promise<string | null> {
+  const { execSync } = await import("child_process");
+  
+  // Helper to check if a path is a git root
+  const getGitRoot = (cwd: string): string | null => {
+    try {
+      const result = execSync("git rev-parse --show-toplevel", {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      return result.trim();
+    } catch {
+      return null;
+    }
+  };
 
-  // Get workspace root
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (!workspaceFolders || workspaceFolders.length === 0) {
-    log("Extension", "No workspace folder open");
-    return;
+  // 1. Try active file's directory first
+  const activeEditor = vscode.window.activeTextEditor;
+  if (activeEditor && activeEditor.document.uri.scheme === "file") {
+    const filePath = activeEditor.document.uri.fsPath;
+    const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
+    const gitRoot = getGitRoot(dirPath);
+    if (gitRoot) {
+      log("Extension", `Found git repo from active file: ${gitRoot}`);
+      return gitRoot;
+    }
   }
 
-  workspaceRoot = workspaceFolders[0].uri.fsPath;
-  log("Extension", `Workspace root: ${workspaceRoot}`);
+  // 2. Try each workspace folder
+  for (const folder of workspaceFolders) {
+    const gitRoot = getGitRoot(folder.uri.fsPath);
+    if (gitRoot) {
+      log("Extension", `Found git repo in workspace folder: ${gitRoot}`);
+      return gitRoot;
+    }
+  }
 
-  // Initialize Git driver
+  return null;
+}
+
+/**
+ * Setup listeners to detect when user opens a file in a git repo
+ */
+function setupDeferredActivation(context: vscode.ExtensionContext): void {
+  log("Extension", "Setting up deferred activation - waiting for git repo file...");
+  
+  deferredActivationDisposable = vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+    if (!editor || editor.document.uri.scheme !== "file") return;
+    
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) return;
+    
+    const gitRoot = await findGitRoot(workspaceFolders);
+    if (gitRoot) {
+      log("Extension", `Git repo detected, activating GitSpectra for: ${gitRoot}`);
+      
+      // Dispose this listener
+      if (deferredActivationDisposable) {
+        deferredActivationDisposable.dispose();
+        deferredActivationDisposable = null;
+      }
+      
+      // Re-activate with the found git root
+      workspaceRoot = gitRoot;
+      await activateForGitRepo(context, gitRoot);
+    }
+  });
+  
+  context.subscriptions.push(deferredActivationDisposable);
+}
+
+/**
+ * Core activation logic once git repo is found
+ */
+async function activateForGitRepo(context: vscode.ExtensionContext, repoRoot: string): Promise<void> {
+  workspaceRoot = repoRoot;
   gitDriver = new GitDriver(workspaceRoot);
-
-  // Check if this is a Git repository
-  const isGitRepo = await gitDriver.isGitRepository();
-  if (!isGitRepo) {
-    log("Extension", "Not a Git repository, GitSpectra will not activate");
-    return;
-  }
-
+  
   // Set context for "when" clauses
-  await vscode.commands.executeCommand(
-    "setContext",
-    "gitspectra.hasGit",
-    true
-  );
+  await vscode.commands.executeCommand("setContext", "gitspectra.hasGit", true);
 
   log("Extension", "Git repository detected, initializing GitSpectra...");
 
@@ -123,9 +179,114 @@ export async function activate(context: vscode.ExtensionContext) {
     setupFetchInterval(newConfig);
   });
 
-  // Register commands
+  // Register disposables
+  context.subscriptions.push(
+    { dispose: () => configLoader.dispose() },
+    { dispose: () => decorationProvider.dispose() },
+    { dispose: () => fileDecorationProvider.dispose() },
+    { dispose: () => statusBarProvider.dispose() },
+    { dispose: () => clearFetchInterval() }
+  );
+
+  // Setup auto-fetch interval
+  setupFetchInterval(config);
+
+  // Show status bar immediately
+  statusBarProvider.show();
+  log("Extension", "Status bar shown");
+
+  // Initial check
+  isInitialized = true;
+  
+  // Delay initial check slightly to let UI settle
+  setTimeout(async () => {
+    await checkForConflicts();
+  }, 1000);
+
+  log("Extension", "GitSpectra activated successfully");
+  log("Extension", `Git root: ${workspaceRoot}`);
+  log("Extension", `Configured branches: ${config.scope?.branches?.join(", ") || "origin/main"}`);
+  log("Extension", `Fetch interval: ${config.fetch?.interval || 300}s`);
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  log("Extension", "GitSpectra is activating...");
+
+  // Get workspace root
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    log("Extension", "No workspace folder open");
+    return;
+  }
+
+  // Try to find a git repository:
+  // 1. Check the active file's directory first
+  // 2. Fallback to workspace folders
+  workspaceRoot = await findGitRoot(workspaceFolders);
+  
+  if (!workspaceRoot) {
+    log("Extension", "No Git repository found in workspace or active file");
+    // Don't return - set up listeners to activate when a git repo is opened
+    setupDeferredActivation(context);
+    return;
+  }
+
+  log("Extension", `Git root found: ${workspaceRoot}`);
+
+  // Initialize Git driver
+  gitDriver = new GitDriver(workspaceRoot);
+
+  // Verify it's a git repo
+  const isGitRepo = await gitDriver.isGitRepository();
+  if (!isGitRepo) {
+    log("Extension", "Not a Git repository, GitSpectra will not activate");
+    setupDeferredActivation(context);
+    return;
+  }
+
+  // Register commands that work without git first (logging commands)
+  registerCommands(context);
+  
+  // Activate for the found git repo
+  await activateForGitRepo(context, workspaceRoot);
+
+  // Register for editor events
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) {
+        updateEditorDecorations(editor);
+      }
+    }),
+
+    vscode.workspace.onDidSaveTextDocument(async (document) => {
+      const config = configLoader.getConfig();
+      if (config.fetch?.onSave) {
+        await checkForConflicts();
+      }
+    }),
+
+    vscode.workspace.onDidOpenTextDocument(async (document) => {
+      // Analyze newly opened files
+      const editor = vscode.window.visibleTextEditors.find(
+        (e) => e.document === document
+      );
+      if (editor) {
+        await analyzeAndDecorate(editor);
+      }
+    })
+  );
+}
+
+/**
+ * Register all commands
+ */
+function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("gitspectra.checkNow", async () => {
+      if (!isInitialized) {
+        vscode.window.showWarningMessage("GitSpectra: No git repository detected");
+        return;
+      }
       await checkForConflicts();
     }),
 
@@ -134,7 +295,9 @@ export async function activate(context: vscode.ExtensionContext) {
       // Focus the GitSpectra panel in the sidebar
       await vscode.commands.executeCommand("gitspectra.panel.focus");
       // Refresh the panel data
-      await conflictPanelProvider.refresh();
+      if (conflictPanelProvider) {
+        await conflictPanelProvider.refresh();
+      }
     }),
 
     vscode.commands.registerCommand("gitspectra.configure", () => {
@@ -146,7 +309,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("gitspectra.dismissAll", () => {
       conflictCache.clear();
-      fileDecorationProvider.clearAll();
+      if (fileDecorationProvider) {
+        fileDecorationProvider.clearAll();
+      }
       updateAllEditors();
       vscode.window.showInformationMessage(
         "GitSpectra: All conflicts dismissed"
@@ -158,9 +323,11 @@ export async function activate(context: vscode.ExtensionContext) {
       (filePath?: string) => {
         const file =
           filePath || vscode.window.activeTextEditor?.document.uri.fsPath;
-        if (file) {
+        if (file && gitDriver) {
           conflictCache.delete(gitDriver.getRelativePath(file));
-          fileDecorationProvider.updateFileReport(file, null);
+          if (fileDecorationProvider) {
+            fileDecorationProvider.updateFileReport(file, null);
+          }
           updateActiveEditor();
         }
       }
@@ -232,7 +399,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand("gitspectra.refreshActivity", async () => {
       log("Command", "Refresh Activity Feed requested");
-      await activityFeedProvider.refresh();
+      if (activityFeedProvider) {
+        await activityFeedProvider.refresh();
+      }
     }),
 
     vscode.commands.registerCommand("gitspectra.showActivityFeed", async () => {
@@ -240,59 +409,6 @@ export async function activate(context: vscode.ExtensionContext) {
       await vscode.commands.executeCommand("gitspectra.activityFeed.focus");
     })
   );
-
-  // Register for editor events
-  context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor) {
-        updateEditorDecorations(editor);
-      }
-    }),
-
-    vscode.workspace.onDidSaveTextDocument(async (document) => {
-      if (config.fetch?.onSave) {
-        await checkForConflicts();
-      }
-    }),
-
-    vscode.workspace.onDidOpenTextDocument(async (document) => {
-      // Analyze newly opened files
-      const editor = vscode.window.visibleTextEditors.find(
-        (e) => e.document === document
-      );
-      if (editor) {
-        await analyzeAndDecorate(editor);
-      }
-    })
-  );
-
-  // Register disposables
-  context.subscriptions.push(
-    { dispose: () => configLoader.dispose() },
-    { dispose: () => decorationProvider.dispose() },
-    { dispose: () => fileDecorationProvider.dispose() },
-    { dispose: () => statusBarProvider.dispose() },
-    { dispose: () => clearFetchInterval() }
-  );
-
-  // Setup auto-fetch interval
-  setupFetchInterval(config);
-
-  // Show status bar immediately
-  statusBarProvider.show();
-  log("Extension", "Status bar shown");
-
-  // Initial check
-  isInitialized = true;
-  
-  // Delay initial check slightly to let UI settle
-  setTimeout(async () => {
-    await checkForConflicts();
-  }, 1000);
-
-  log("Extension", "GitSpectra activated successfully");
-  log("Extension", `Configured branches: ${config.scope?.branches?.join(", ") || "origin/main"}`);
-  log("Extension", `Fetch interval: ${config.fetch?.interval || 300}s`);
 }
 
 /**

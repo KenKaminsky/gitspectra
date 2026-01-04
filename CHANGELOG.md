@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-01-04
+
+### Fixed
+
+- **Multi-project workspace support**: GitSpectra now detects git repos from the active file's directory, not just the workspace root. This enables use when opening a parent folder containing multiple git repos (e.g., `~/Projects/`).
+- Added deferred activation: If no git repo is found initially, GitSpectra will auto-activate when you open a file in a git repository.
+
+## [0.1.1] - 2026-01-04
+
 ### Changed
 
 - License changed from MIT to **AGPL-3.0** for better open source protection
+- Fixed GitHub repository URLs
 
 ## [0.1.0] - 2026-01-03
 
