@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Activity Feed Enhancements**
+
   - Inline commit details expansion with file list
   - View individual file diffs from commit details
   - Open commits and branches on GitHub directly

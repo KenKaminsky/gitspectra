@@ -3,56 +3,66 @@
  * 
  * Fake team member profiles for demo scenarios.
  * These create a realistic-looking team for marketing videos.
+ * 
+ * Uses DiceBear avatars for professional, human-looking illustrations.
+ * Available styles: 
+ * - avataaars: Cartoon-style avatars (like Slack/Notion)
+ * - lorelei: Beautiful illustrated portraits
+ * - personas: Artistic human illustrations
+ * - notionists: Notion-style minimal avatars
  */
 
 import type { DemoTeamMember } from './types.js';
 
-// Gravatar hash helper - generates consistent avatar URLs
-function gravatarUrl(email: string): string {
-  const crypto = require('crypto');
-  const hash = crypto.createHash('md5').update(email.toLowerCase().trim()).digest('hex');
-  return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=80`;
+/**
+ * DiceBear avatar URL generator
+ * Style options: avataaars, lorelei, personas, notionists, adventurer, big-smile
+ */
+function diceBearAvatar(seed: string, style: string = 'lorelei'): string {
+  // Using lorelei style for beautiful, diverse human-looking avatars
+  return `https://api.dicebear.com/7.x/${style}/svg?seed=${encodeURIComponent(seed)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 }
 
 /**
  * Demo team - diverse, professional-looking team for marketing
+ * Each member has a unique DiceBear avatar that's consistent (seed-based)
  */
 export const DEMO_TEAM: DemoTeamMember[] = [
   {
     name: 'Sarah Chen',
     email: 'sarah.chen@acme.dev',
     githubUsername: 'sarahchen',
-    avatar: gravatarUrl('sarah.chen@acme.dev'),
+    avatar: diceBearAvatar('sarah-chen-dev', 'lorelei'),
   },
   {
     name: 'Marcus Johnson',
     email: 'marcus.j@acme.dev',
     githubUsername: 'marcusj',
-    avatar: gravatarUrl('marcus.j@acme.dev'),
+    avatar: diceBearAvatar('marcus-johnson-dev', 'lorelei'),
   },
   {
     name: 'Elena Rodriguez',
     email: 'elena.r@acme.dev',
     githubUsername: 'elenarodriguez',
-    avatar: gravatarUrl('elena.r@acme.dev'),
+    avatar: diceBearAvatar('elena-rodriguez-dev', 'lorelei'),
   },
   {
     name: 'Alex Kim',
     email: 'alex.kim@acme.dev',
     githubUsername: 'alexkim',
-    avatar: gravatarUrl('alex.kim@acme.dev'),
+    avatar: diceBearAvatar('alex-kim-dev', 'lorelei'),
   },
   {
     name: 'Jordan Taylor',
     email: 'jordan.t@acme.dev',
     githubUsername: 'jordant',
-    avatar: gravatarUrl('jordan.t@acme.dev'),
+    avatar: diceBearAvatar('jordan-taylor-dev', 'lorelei'),
   },
   {
     name: 'Priya Sharma',
     email: 'priya.s@acme.dev',
     githubUsername: 'priyasharma',
-    avatar: gravatarUrl('priya.s@acme.dev'),
+    avatar: diceBearAvatar('priya-sharma-dev', 'lorelei'),
   },
 ];
 

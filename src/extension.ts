@@ -421,6 +421,14 @@ function registerCommands(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       "gitspectra.viewDiff",
       async (args: { file: string; branch: string }) => {
+        log("Command", `View Diff requested: file=${args.file}, branch=${args.branch}`);
+        log("Command", `Current workspaceRoot: ${workspaceRoot}`);
+        
+        if (!args.file || !args.branch) {
+          vscode.window.showErrorMessage("GitSpectra: Missing file or branch for diff view");
+          return;
+        }
+        
         await openDiffView(args.file, args.branch);
       }
     ),
@@ -452,6 +460,45 @@ function registerCommands(context: vscode.ExtensionContext): void {
       "gitspectra.dismissConflict",
       (args: { file: string; line: number }) => {
         log("Command", `Dismiss conflict at line ${args.line} in ${args.file}`);
+        
+        if (!args.file) {
+          vscode.window.showErrorMessage("GitSpectra: Missing file for dismiss");
+          return;
+        }
+        
+        // Remove the conflict from cache
+        const relativePath = args.file.startsWith("/") && workspaceRoot
+          ? args.file.slice(workspaceRoot.length + 1)
+          : args.file;
+          
+        const report = conflictCache.get(relativePath);
+        if (report) {
+          // Filter out the dismissed conflict/warning by line
+          report.conflicts = report.conflicts.filter(
+            c => c.lines.start !== args.line && c.lines.end !== args.line
+          );
+          report.warnings = report.warnings.filter(
+            w => w.lines.start !== args.line && w.lines.end !== args.line
+          );
+          
+          // Update cache
+          conflictCache.set(relativePath, report);
+          
+          // Update file decorations
+          if (fileDecorationProvider) {
+            const absolutePath = `${workspaceRoot}/${relativePath}`;
+            fileDecorationProvider.updateFileReport(absolutePath, report);
+          }
+          
+          // Refresh decorations on active editor
+          updateActiveEditor();
+          
+          // Refresh panel
+          if (conflictPanelProvider) {
+            conflictPanelProvider.refresh();
+          }
+        }
+        
         vscode.window.showInformationMessage(
           `Dismissed conflict at line ${args.line}`
         );
@@ -462,6 +509,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
       "gitspectra.cherryPick",
       async (args: { commit: string; branch: string }) => {
         log("Command", `Cherry pick from ${args.branch} (commit: ${args.commit})`);
+        log("Command", `Current workspaceRoot: ${workspaceRoot}`);
+        
+        if (!args.commit) {
+          vscode.window.showErrorMessage("GitSpectra: Missing commit hash for cherry-pick");
+          return;
+        }
         
         const result = await vscode.window.showInformationMessage(
           `Cherry pick changes from ${args.branch}?`,
@@ -472,8 +525,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
         
         if (result === "Cherry Pick") {
           try {
-            // Execute git cherry-pick
-            const terminal = vscode.window.createTerminal("GitSpectra");
+            // Execute git cherry-pick in the correct repo directory
+            const terminal = vscode.window.createTerminal({
+              name: "GitSpectra",
+              cwd: workspaceRoot,
+            });
             terminal.show();
             terminal.sendText(`git cherry-pick ${args.commit}`);
           } catch (err) {
@@ -481,8 +537,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
             vscode.window.showErrorMessage(`Cherry pick failed: ${err}`);
           }
         } else if (result === "View Commit") {
-          // Open the commit in the git log
-          const terminal = vscode.window.createTerminal("GitSpectra");
+          // Open the commit in the git log in the correct repo directory
+          const terminal = vscode.window.createTerminal({
+            name: "GitSpectra",
+            cwd: workspaceRoot,
+          });
           terminal.show();
           terminal.sendText(`git show ${args.commit}`);
         }
@@ -559,14 +618,40 @@ function registerCommands(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand("gitspectra.demo.reset", async () => {
+      log("Command", "Demo Reset requested");
       const demoOrchestrator = getDemoOrchestrator();
       await demoOrchestrator.reset();
-      // Also clear real conflict cache
+      
+      // Clear all conflict caches
       conflictCache.clear();
+      
+      // Clear file explorer decorations
       if (fileDecorationProvider) {
         fileDecorationProvider.clearAll();
       }
+      
+      // Clear editor decorations
       updateAllEditors();
+      
+      // Reset status bar
+      if (statusBarProvider) {
+        statusBarProvider.updateResult({
+          reports: new Map(),
+          totalConflicts: 0,
+          totalWarnings: 0,
+          analyzedAt: new Date(),
+        });
+      }
+      
+      // Refresh panels
+      if (conflictPanelProvider) {
+        await conflictPanelProvider.refresh();
+      }
+      if (activityFeedProvider) {
+        await activityFeedProvider.refresh();
+      }
+      
+      log("Command", "Demo Reset complete - all state cleared");
     }),
 
     vscode.commands.registerCommand("gitspectra.demo.injectConflict", async () => {

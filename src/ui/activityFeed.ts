@@ -207,16 +207,16 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   public injectDemoActivity(activity: {
     id: string;
-    type: 'commit' | 'branch' | 'merge';
+    type: "commit" | "branch" | "merge";
     author: { name: string; email: string; avatar?: string };
     date: Date;
     branch: string;
     message: string;
-    files: { path: string; status: 'added' | 'modified' | 'deleted' }[];
+    files: { path: string; status: "added" | "modified" | "deleted" }[];
     isMerge?: boolean;
   }): void {
     log("ActivityFeed", `Injecting demo activity from ${activity.author.name}`);
-    
+
     const activityItem: ActivityItem = {
       id: activity.id,
       type: activity.type,
@@ -225,7 +225,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       date: activity.date,
       branch: activity.branch,
       message: activity.message,
-      files: activity.files.map(f => ({
+      files: activity.files.map((f) => ({
         path: f.path,
         status: f.status,
         youAlsoTouched: this.yourRecentFiles.has(f.path),
@@ -236,7 +236,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
     // Add to beginning of activities (most recent first)
     this.demoActivities.unshift(activityItem);
-    
+
     // Merge with real activities and update view
     this.updateViewWithDemoData();
   }
@@ -265,10 +265,10 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   private updateViewWithDemoData(): void {
     // Merge demo activities with real activities
     const mergedActivities = [...this.demoActivities, ...this.activities];
-    
+
     // Sort by date (most recent first)
     mergedActivities.sort((a, b) => b.date.getTime() - a.date.getTime());
-    
+
     // Temporarily replace activities for rendering
     const originalActivities = this.activities;
     this.activities = mergedActivities;
