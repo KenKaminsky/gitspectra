@@ -5,14 +5,23 @@ This document describes how to release a new version of GitSpectra.
 ## Quick Reference
 
 ```bash
-# 1. Update version in package.json
-npm version patch  # or minor, major
+# 1. Run pre-release checks (lint + build + package)
+npm run prerelease
 
-# 2. Push with tags
+# 2. If all passes, bump version and commit
+npm version patch -m "v%s"  # or minor, major
+
+# 3. Push with tags
 git push origin main --tags
 
-# 3. Wait for GitHub Actions to publish
+# 4. Wait for GitHub Actions to publish
 # Check: https://github.com/KenKaminsky/gitspectra/actions
+```
+
+## One-Liner (if you're confident)
+
+```bash
+npm run prerelease && npm version patch -m "v%s" && git push origin main --tags
 ```
 
 ---

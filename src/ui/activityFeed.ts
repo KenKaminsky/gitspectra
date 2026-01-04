@@ -3268,7 +3268,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   private async openCommitDiff(commitHash: string): Promise<void> {
     try {
-
       // Get the parent commit (for comparison)
       let parentHash: string;
       try {
@@ -3384,7 +3383,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   private async openCommitDiffFallback(commitHash: string): Promise<void> {
     try {
-
       // Get the list of changed files in this commit
       const files = execSync(
         `git diff-tree --no-commit-id --name-only -r ${commitHash}`,
@@ -3461,7 +3459,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   private async getCommitDetails(commitHash: string): Promise<string> {
     try {
-
       // Get full commit message (body - the part after the first line)
       let body = "";
       try {
@@ -3648,7 +3645,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     filePath: string
   ): Promise<void> {
     try {
-
       // Get parent commit hash
       let parentHash: string;
       try {
