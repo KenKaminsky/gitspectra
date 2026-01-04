@@ -117,15 +117,17 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             branch: data.branch,
           });
           break;
-        case "openFile":
+        case "openFile": {
           const uri = vscode.Uri.file(`${this.workspacePath}/${data.file}`);
           vscode.commands.executeCommand("vscode.open", uri);
           break;
-        case "pullLatest":
+        }
+        case "pullLatest": {
           const terminal = vscode.window.createTerminal("GitSpectra");
           terminal.show();
           terminal.sendText("git pull");
           break;
+        }
       }
     });
 

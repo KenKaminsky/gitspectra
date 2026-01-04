@@ -26,12 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Core Conflict Detection**
+
   - Real-time conflict detection using `git merge-tree`
   - Gutter icons with author avatars (Gravatar)
   - Line highlighting for conflict locations
   - Accurate changed-line detection (only actual diff lines, not context)
 
 - **UI Components**
+
   - Status bar showing conflict/warning count
   - Rich hover tooltips with author, branch, commit info
   - File explorer badges for files with conflicts
@@ -39,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Activity Feed panel with Timeline, By Person, and Hot Files views
 
 - **Configuration**
+
   - VS Code settings integration
   - `.gitspectra.json` team configuration file support
   - Configurable fetch intervals
@@ -64,4 +67,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: https://github.com/KenKaminsky/gitspectra/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/KenKaminsky/gitspectra/releases/tag/v0.1.0
-
