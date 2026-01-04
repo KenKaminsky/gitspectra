@@ -186,14 +186,12 @@
       "gitspectra": [
         {
           "id": "gitspectra.panel",
-          "name": "Conflict Radar",
-          "when": "gitspectra.hasGit"
+          "name": "Conflict Radar"
         },
         {
           "id": "gitspectra.activityFeed",
           "type": "webview",
-          "name": "Activity Feed",
-          "when": "gitspectra.hasGit"
+          "name": "Activity Feed"
         }
       ]
     },
@@ -209,7 +207,13 @@
     "viewsWelcome": [
       {
         "view": "gitspectra.panel",
-        "contents": "No conflicts detected.\n[Check Now](command:gitspectra.checkNow)\n[Configure](command:gitspectra.configure)"
+        "contents": "Open a file in a Git repository to start detecting conflicts.\n\nGitSpectra will automatically activate when you open a file inside a git repo.",
+        "when": "!gitspectra.hasGit"
+      },
+      {
+        "view": "gitspectra.panel",
+        "contents": "No conflicts detected.\n[Check Now](command:gitspectra.checkNow)\n[Configure](command:gitspectra.configure)",
+        "when": "gitspectra.hasGit"
       }
     ],
     "menus": {

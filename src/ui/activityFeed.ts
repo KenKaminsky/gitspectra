@@ -2596,4 +2596,8 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   setConfig(config: GitSpectraConfig): void {
     this.config = config;
   }
+
+  setWorkspacePath(workspacePath: string): void {
+    this.workspacePath = workspacePath;
+  }
 }

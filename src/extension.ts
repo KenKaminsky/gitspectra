@@ -80,6 +80,76 @@ async function findGitRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]):
 }
 
 /**
+ * Get the git root for a specific file path (synchronous)
+ */
+function getGitRootForFile(filePath: string): string | null {
+  const { execSync } = require("child_process");
+  const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
+  
+  try {
+    const result = execSync("git rev-parse --show-toplevel", {
+      cwd: dirPath,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return result.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Switch GitSpectra to a different git repository
+ */
+async function switchToRepo(context: vscode.ExtensionContext, newRepoRoot: string): Promise<void> {
+  log("Extension", `Switching GitSpectra context to: ${newRepoRoot}`);
+  
+  // Update the workspace root
+  workspaceRoot = newRepoRoot;
+  
+  // Re-initialize git driver for new repo
+  gitDriver = new GitDriver(workspaceRoot);
+  
+  // Re-initialize config loader for new repo (may have different .gitspectra.json)
+  if (configLoader) {
+    configLoader.dispose();
+  }
+  configLoader = new ConfigLoader(workspaceRoot);
+  configLoader.initialize();
+  
+  const config = configLoader.getConfig();
+  
+  // Update existing providers with new config and repo
+  if (conflictDetector) {
+    conflictDetector = new ConflictDetector(gitDriver, config);
+  }
+  if (decorationProvider) {
+    decorationProvider.setConfig(config);
+  }
+  if (statusBarProvider) {
+    statusBarProvider.setConfig(config);
+  }
+  if (conflictPanelProvider) {
+    conflictPanelProvider = new ConflictPanelProvider(gitDriver, config, workspaceRoot);
+  }
+  if (activityFeedProvider) {
+    activityFeedProvider.setWorkspacePath(workspaceRoot);
+    activityFeedProvider.setConfig(config);
+  }
+  
+  // Clear old conflict cache
+  conflictCache.clear();
+  if (fileDecorationProvider) {
+    fileDecorationProvider.clearAll();
+  }
+  
+  log("Extension", `Now tracking: ${workspaceRoot}`);
+  
+  // Refresh data for new repo
+  await checkForConflicts();
+}
+
+/**
  * Setup listeners to detect when user opens a file in a git repo
  */
 function setupDeferredActivation(context: vscode.ExtensionContext): void {
@@ -219,6 +289,9 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
 
+  // Always register commands first (they'll show helpful messages if no git repo)
+  registerCommands(context);
+
   // Try to find a git repository:
   // 1. Check the active file's directory first
   // 2. Fallback to workspace folders
@@ -244,17 +317,21 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  // Register commands that work without git first (logging commands)
-  registerCommands(context);
-  
   // Activate for the found git repo
   await activateForGitRepo(context, workspaceRoot);
 
   // Register for editor events
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor) {
-        updateEditorDecorations(editor);
+    vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+      if (editor && editor.document.uri.scheme === "file") {
+        // Check if file is in a different git repo
+        const fileGitRoot = getGitRootForFile(editor.document.uri.fsPath);
+        if (fileGitRoot && fileGitRoot !== workspaceRoot) {
+          log("Extension", `Switching to different repo: ${fileGitRoot}`);
+          await switchToRepo(context, fileGitRoot);
+        } else {
+          updateEditorDecorations(editor);
+        }
       }
     }),
 
