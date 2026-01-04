@@ -10,6 +10,8 @@
 
 import * as vscode from "vscode";
 import * as crypto from "crypto";
+import * as fs from "fs";
+import { execSync } from "child_process";
 import type { GitDriver, Commit } from "../git/driver.js";
 import type { GitSpectraConfig } from "../config/types.js";
 import { log } from "../utils/logger.js";
@@ -122,7 +124,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
           break;
         case "openFile": {
           const filePath = `${this.workspacePath}/${data.file}`;
-          const fs = require("fs");
           if (fs.existsSync(filePath)) {
             const uri = vscode.Uri.file(filePath);
             vscode.commands.executeCommand("vscode.open", uri);
@@ -432,7 +433,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       deletions: number;
     }[]
   > {
-    const { execSync } = require("child_process");
 
     // Use git diff-tree with numstat to get additions/deletions per file
     const output = execSync(
@@ -3268,7 +3268,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   private async openCommitDiff(commitHash: string): Promise<void> {
     try {
-      const { execSync } = require("child_process");
 
       // Get the parent commit (for comparison)
       let parentHash: string;
@@ -3385,7 +3384,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   private async openCommitDiffFallback(commitHash: string): Promise<void> {
     try {
-      const { execSync } = require("child_process");
 
       // Get the list of changed files in this commit
       const files = execSync(
@@ -3463,7 +3461,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    */
   private async getCommitDetails(commitHash: string): Promise<string> {
     try {
-      const { execSync } = require("child_process");
 
       // Get full commit message (body - the part after the first line)
       let body = "";
@@ -3651,7 +3648,6 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     filePath: string
   ): Promise<void> {
     try {
-      const { execSync } = require("child_process");
 
       // Get parent commit hash
       let parentHash: string;
@@ -3715,14 +3711,13 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     try {
       // Get the remote URL
-      const { execSync } = require("child_process");
       const remoteUrl = execSync("git remote get-url origin", {
         cwd: this.workspacePath,
         encoding: "utf-8",
       }).trim();
 
       // Convert git URL to GitHub web URL
-      let baseUrl = remoteUrl
+      const baseUrl = remoteUrl
         .replace(/\.git$/, "")
         .replace(/^git@github\.com:/, "https://github.com/")
         .replace(/^ssh:\/\/git@github\.com\//, "https://github.com/");

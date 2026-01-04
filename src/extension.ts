@@ -7,6 +7,7 @@
  */
 
 import * as vscode from "vscode";
+import { execSync } from "child_process";
 import { GitDriver } from "./git/driver.js";
 import { ConflictDetector, FileConflictReport } from "./analyzer/conflictDetector.js";
 import { ConfigLoader } from "./config/loader.js";
@@ -84,7 +85,6 @@ async function findGitRoot(workspaceFolders: readonly vscode.WorkspaceFolder[]):
  * Get the git root for a specific file path (synchronous)
  */
 function getGitRootForFile(filePath: string): string | null {
-  const { execSync } = require("child_process");
   const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
   
   try {

@@ -161,19 +161,19 @@ export class DemoOrchestrator {
     
     // Clear UI
     if (this.activityFeedProvider) {
-      // @ts-ignore - we'll add this method
+      // @ts-expect-error - optional method for demo cleanup
       this.activityFeedProvider.clearDemoData?.();
       this.activityFeedProvider.refresh();
     }
     
     if (this.conflictPanelProvider) {
-      // @ts-ignore
+      // @ts-expect-error - dynamic property access for demo injection
       this.conflictPanelProvider.clearDemoData?.();
       this.conflictPanelProvider.refresh();
     }
     
     if (this.decorationProvider) {
-      // @ts-ignore
+      // @ts-expect-error - dynamic property access for demo injection
       this.decorationProvider.clearDemoData?.();
     }
     
@@ -269,21 +269,21 @@ export class DemoOrchestrator {
       case 'scrollActivityFeed':
         // Send message to webview to scroll
         if (this.activityFeedProvider) {
-          // @ts-ignore
+          // @ts-expect-error - dynamic property access for demo injection
           this.activityFeedProvider.postMessage?.({ type: 'scrollTo', position: event.data?.position || 'top' });
         }
         break;
 
       case 'filterByPerson':
         if (this.activityFeedProvider && event.data?.email) {
-          // @ts-ignore
+          // @ts-expect-error - dynamic property access for demo injection
           this.activityFeedProvider.postMessage?.({ type: 'filterAuthor', author: event.data.email });
         }
         break;
 
       case 'switchView':
         if (this.activityFeedProvider && event.data?.view) {
-          // @ts-ignore
+          // @ts-expect-error - dynamic property access for demo injection
           this.activityFeedProvider.postMessage?.({ type: 'viewMode', mode: event.data.view });
         }
         break;
@@ -321,7 +321,7 @@ export class DemoOrchestrator {
 
     // Inject into activity feed provider
     if (this.activityFeedProvider) {
-      // @ts-ignore - we'll add this method
+      // @ts-expect-error - optional method for demo injection
       this.activityFeedProvider.injectDemoActivity?.(activity);
     }
   }
@@ -380,7 +380,7 @@ export class DemoOrchestrator {
     }
 
     if (this.conflictPanelProvider) {
-      // @ts-ignore
+      // @ts-expect-error - dynamic property access for demo injection
       this.conflictPanelProvider.injectDemoConflict?.(conflict.file, report);
       await this.conflictPanelProvider.refresh();
     }
