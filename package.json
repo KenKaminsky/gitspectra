@@ -2,7 +2,7 @@
   "name": "gitspectra",
   "displayName": "GitSpectra",
   "description": "See the full spectrum of your Git. Local-only conflict detection for VS Code. No cloud. No tracking. Just Git.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "gitspectra",
   "license": "AGPL-3.0-only",
   "icon": "images/icon.png",
