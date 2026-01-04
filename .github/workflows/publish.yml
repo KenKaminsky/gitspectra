@@ -1,19 +1,24 @@
 name: Publish Extension
 
 on:
+  # Trigger on version tags (v0.1.3, v1.0.0, etc.)
   push:
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "package.json"
-      - "images/**"
-      - "README.md"
-      - "CHANGELOG.md"
+    tags:
+      - 'v*.*.*'
+  
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (package only, no publish)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,13 +35,74 @@ jobs:
       - name: Build extension
         run: npm run build
 
+      - name: Get version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      - name: Package extension
+        run: |
+          npx vsce package --no-dependencies
+          echo "📦 Created VSIX package"
+          ls -la *.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitspectra-${{ steps.version.outputs.version }}.vsix
+          path: '*.vsix'
+          retention-days: 90
+
+      # Only publish if not a dry run
       - name: Publish to VS Code Marketplace
-        run: npx vsce publish -p ${{ secrets.VSCE_PAT }}
-        continue-on-error: true
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "🚀 Publishing to VS Code Marketplace..."
+          npx vsce publish -p ${{ secrets.VSCE_PAT }}
+          echo "✅ Published to VS Code Marketplace"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Publish to Open VSX
-        run: npx ovsx publish -p ${{ secrets.OVSX_PAT }}
-        continue-on-error: true
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "🚀 Publishing to Open VSX..."
+          npx ovsx publish -p ${{ secrets.OVSX_PAT }}
+          echo "✅ Published to Open VSX"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
+        uses: softprops/action-gh-release@v1
+        with:
+          files: '*.vsix'
+          generate_release_notes: true
+          body: |
+            ## GitSpectra ${{ steps.version.outputs.version }}
+            
+            ### Installation
+            - **VS Code Marketplace**: [Install GitSpectra](https://marketplace.visualstudio.com/items?itemName=gitspectra.gitspectra)
+            - **Open VSX**: [Install GitSpectra](https://open-vsx.org/extension/gitspectra/gitspectra)
+            - **Manual**: Download the `.vsix` file below and install via `code --install-extension gitspectra-${{ steps.version.outputs.version }}.vsix`
+            
+            See [CHANGELOG.md](https://github.com/KenKaminsky/gitspectra/blob/main/CHANGELOG.md) for details.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
+      - name: Summary
+        run: |
+          echo "## 📦 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "⚠️ **Dry run** - package created but not published" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Published to:" >> $GITHUB_STEP_SUMMARY
+            echo "- VS Code Marketplace" >> $GITHUB_STEP_SUMMARY
+            echo "- Open VSX Registry" >> $GITHUB_STEP_SUMMARY
+            echo "- GitHub Releases" >> $GITHUB_STEP_SUMMARY
+          fi
