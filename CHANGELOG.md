@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Demo Mode for Marketing Videos**
+  - `GitSpectra: Demo - Start Scenario` - Run pre-built demo scenarios
+  - `GitSpectra: Demo - Inject Conflict` - Manually inject a fake conflict
+  - `GitSpectra: Demo - Inject Activity` - Manually inject a fake team activity
+  - `GitSpectra: Demo - Stop` / `Demo - Reset` - Control demo playback
+  - Pre-built scenarios: Conflict Detection, Activity Feed, Full Overview, Privacy, Looping Activity
+  - Fake team members with realistic names and Gravatar avatars
+  - Timed events for repeatable video recordings
+
 ## [0.1.3] - 2026-01-04
 
 ### Added

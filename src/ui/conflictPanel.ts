@@ -71,6 +71,28 @@ export class ConflictPanelProvider
     this.workspacePath = workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
   }
 
+  // ========== Demo Mode Methods ==========
+
+  private demoConflicts: Map<string, any> = new Map();
+
+  /**
+   * Inject a demo conflict (for marketing videos)
+   */
+  public injectDemoConflict(file: string, report: any): void {
+    log("Panel", `Injecting demo conflict for ${file}`);
+    this.demoConflicts.set(file, report);
+  }
+
+  /**
+   * Clear all demo data
+   */
+  public clearDemoData(): void {
+    log("Panel", "Clearing demo data");
+    this.demoConflicts.clear();
+  }
+
+  // ========== End Demo Mode Methods ==========
+
   /**
    * Get Gravatar URL for an email address
    */

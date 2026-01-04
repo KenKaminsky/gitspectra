@@ -109,6 +109,36 @@
         "title": "Show Activity Feed",
         "category": "GitSpectra",
         "icon": "$(pulse)"
+      },
+      {
+        "command": "gitspectra.demo.startScenario",
+        "title": "Demo - Start Scenario",
+        "category": "GitSpectra",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gitspectra.demo.stop",
+        "title": "Demo - Stop",
+        "category": "GitSpectra",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gitspectra.demo.reset",
+        "title": "Demo - Reset",
+        "category": "GitSpectra",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitspectra.demo.injectConflict",
+        "title": "Demo - Inject Conflict",
+        "category": "GitSpectra",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "gitspectra.demo.injectActivity",
+        "title": "Demo - Inject Activity",
+        "category": "GitSpectra",
+        "icon": "$(add)"
       }
     ],
     "configuration": {
@@ -123,6 +153,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug mode - shows verbose logging in the Output panel"
+        },
+        "gitspectra.demoMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable demo mode - shows demo commands for marketing videos (dev only)"
         },
         "gitspectra.fetchInterval": {
           "type": "number",

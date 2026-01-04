@@ -198,6 +198,86 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ========== Demo Mode Methods ==========
+
+  private demoActivities: ActivityItem[] = [];
+
+  /**
+   * Inject a demo activity (for marketing videos)
+   */
+  public injectDemoActivity(activity: {
+    id: string;
+    type: 'commit' | 'branch' | 'merge';
+    author: { name: string; email: string; avatar?: string };
+    date: Date;
+    branch: string;
+    message: string;
+    files: { path: string; status: 'added' | 'modified' | 'deleted' }[];
+    isMerge?: boolean;
+  }): void {
+    log("ActivityFeed", `Injecting demo activity from ${activity.author.name}`);
+    
+    const activityItem: ActivityItem = {
+      id: activity.id,
+      type: activity.type,
+      author: activity.author.name,
+      email: activity.author.email,
+      date: activity.date,
+      branch: activity.branch,
+      message: activity.message,
+      files: activity.files.map(f => ({
+        path: f.path,
+        status: f.status,
+        youAlsoTouched: this.yourRecentFiles.has(f.path),
+        hasConflict: false,
+      })),
+      isMerge: activity.isMerge,
+    };
+
+    // Add to beginning of activities (most recent first)
+    this.demoActivities.unshift(activityItem);
+    
+    // Merge with real activities and update view
+    this.updateViewWithDemoData();
+  }
+
+  /**
+   * Clear all demo data
+   */
+  public clearDemoData(): void {
+    log("ActivityFeed", "Clearing demo data");
+    this.demoActivities = [];
+    this.updateView();
+  }
+
+  /**
+   * Post message to webview
+   */
+  public postMessage(message: any): void {
+    if (this._view) {
+      this._view.webview.postMessage(message);
+    }
+  }
+
+  /**
+   * Update view with demo data merged in
+   */
+  private updateViewWithDemoData(): void {
+    // Merge demo activities with real activities
+    const mergedActivities = [...this.demoActivities, ...this.activities];
+    
+    // Sort by date (most recent first)
+    mergedActivities.sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    // Temporarily replace activities for rendering
+    const originalActivities = this.activities;
+    this.activities = mergedActivities;
+    this.updateView();
+    this.activities = originalActivities;
+  }
+
+  // ========== End Demo Mode Methods ==========
+
   /**
    * Load files you've recently touched
    */

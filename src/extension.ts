@@ -17,6 +17,7 @@ import { ConflictPanelProvider } from "./ui/conflictPanel.js";
 import { ActivityFeedProvider } from "./ui/activityFeed.js";
 import type { GitSpectraConfig } from "./config/types.js";
 import { logger, log, warn, error, copyAllLogs, showLogs } from "./utils/logger.js";
+import { getDemoOrchestrator, ALL_SCENARIOS, getScenarioById, DEMO_TEAM, DEMO_FILE_PATHS } from "./demo/index.js";
 
 let gitDriver: GitDriver;
 let conflictDetector: ConflictDetector;
@@ -507,6 +508,180 @@ function registerCommands(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("gitspectra.showActivityFeed", async () => {
       log("Command", "Show Activity Feed requested");
       await vscode.commands.executeCommand("gitspectra.activityFeed.focus");
+    }),
+
+    // Demo commands (for marketing videos)
+    vscode.commands.registerCommand("gitspectra.demo.startScenario", async () => {
+      const demoOrchestrator = getDemoOrchestrator();
+      
+      // Show scenario picker
+      const items = ALL_SCENARIOS.map(s => ({
+        label: s.name,
+        description: `${Math.round(s.duration / 1000)}s${s.loop ? ' (looping)' : ''}`,
+        detail: s.description,
+        id: s.id,
+      }));
+
+      const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a demo scenario to run',
+        title: 'GitSpectra Demo Scenarios',
+      });
+
+      if (selected) {
+        const scenario = getScenarioById(selected.id);
+        if (scenario) {
+          // Initialize demo orchestrator with providers
+          demoOrchestrator.setProviders({
+            activityFeed: activityFeedProvider,
+            conflictPanel: conflictPanelProvider,
+            decorations: decorationProvider,
+            statusBar: statusBarProvider,
+            workspacePath: workspaceRoot,
+            onConflictInjected: (file, report) => {
+              conflictCache.set(file, report);
+              if (fileDecorationProvider) {
+                const absolutePath = file.startsWith("/") ? file : `${workspaceRoot}/${file}`;
+                fileDecorationProvider.updateFileReport(absolutePath, report);
+              }
+              updateAllEditors();
+            },
+          });
+          
+          await demoOrchestrator.startScenario(scenario);
+        }
+      }
+    }),
+
+    vscode.commands.registerCommand("gitspectra.demo.stop", async () => {
+      const demoOrchestrator = getDemoOrchestrator();
+      await demoOrchestrator.stop();
+      vscode.window.showInformationMessage('🎬 Demo stopped');
+    }),
+
+    vscode.commands.registerCommand("gitspectra.demo.reset", async () => {
+      const demoOrchestrator = getDemoOrchestrator();
+      await demoOrchestrator.reset();
+      // Also clear real conflict cache
+      conflictCache.clear();
+      if (fileDecorationProvider) {
+        fileDecorationProvider.clearAll();
+      }
+      updateAllEditors();
+    }),
+
+    vscode.commands.registerCommand("gitspectra.demo.injectConflict", async () => {
+      const demoOrchestrator = getDemoOrchestrator();
+      
+      // Initialize if not already
+      demoOrchestrator.setProviders({
+        activityFeed: activityFeedProvider,
+        conflictPanel: conflictPanelProvider,
+        decorations: decorationProvider,
+        statusBar: statusBarProvider,
+        workspacePath: workspaceRoot,
+        onConflictInjected: (file, report) => {
+          conflictCache.set(file, report);
+          if (fileDecorationProvider) {
+            const absolutePath = file.startsWith("/") ? file : `${workspaceRoot}/${file}`;
+            fileDecorationProvider.updateFileReport(absolutePath, report);
+          }
+          updateAllEditors();
+        },
+      });
+
+      // Get current file
+      const editor = vscode.window.activeTextEditor;
+      const currentFile = editor?.document.uri.fsPath;
+      const relativePath = currentFile && gitDriver 
+        ? gitDriver.getRelativePath(currentFile)
+        : DEMO_FILE_PATHS[0];
+
+      // Quick inputs for conflict
+      const fileInput = await vscode.window.showInputBox({
+        prompt: 'File path (relative)',
+        value: relativePath,
+      });
+      if (!fileInput) return;
+
+      const lineInput = await vscode.window.showInputBox({
+        prompt: 'Start line',
+        value: editor ? String(editor.selection.active.line + 1) : '45',
+      });
+      if (!lineInput) return;
+
+      const endLineInput = await vscode.window.showInputBox({
+        prompt: 'End line',
+        value: String(parseInt(lineInput) + 5),
+      });
+      if (!endLineInput) return;
+
+      const authorItems = DEMO_TEAM.map(m => ({
+        label: m.name,
+        description: m.email,
+      }));
+      const authorSelected = await vscode.window.showQuickPick(authorItems, {
+        placeHolder: 'Select author',
+      });
+      if (!authorSelected) return;
+
+      const severityItems = [
+        { label: 'Hard Conflict', value: 'hard' as const },
+        { label: 'Soft Warning', value: 'soft' as const },
+      ];
+      const severitySelected = await vscode.window.showQuickPick(severityItems, {
+        placeHolder: 'Select severity',
+      });
+      if (!severitySelected) return;
+
+      await demoOrchestrator.quickInjectConflict(
+        fileInput,
+        parseInt(lineInput),
+        parseInt(endLineInput),
+        authorSelected.label,
+        severitySelected.value
+      );
+    }),
+
+    vscode.commands.registerCommand("gitspectra.demo.injectActivity", async () => {
+      const demoOrchestrator = getDemoOrchestrator();
+      
+      // Initialize if not already
+      demoOrchestrator.setProviders({
+        activityFeed: activityFeedProvider,
+        conflictPanel: conflictPanelProvider,
+        decorations: decorationProvider,
+        statusBar: statusBarProvider,
+        workspacePath: workspaceRoot,
+      });
+
+      // Get author
+      const authorItems = DEMO_TEAM.map(m => ({
+        label: m.name,
+        description: m.email,
+      }));
+      const authorSelected = await vscode.window.showQuickPick(authorItems, {
+        placeHolder: 'Select author',
+      });
+      if (!authorSelected) return;
+
+      // Get message
+      const messageInput = await vscode.window.showInputBox({
+        prompt: 'Commit message',
+        value: 'Update component styles',
+      });
+      if (!messageInput) return;
+
+      // Get file (optional)
+      const fileInput = await vscode.window.showInputBox({
+        prompt: 'File path (optional)',
+        value: DEMO_FILE_PATHS[Math.floor(Math.random() * DEMO_FILE_PATHS.length)],
+      });
+
+      await demoOrchestrator.quickInjectActivity(
+        authorSelected.label,
+        messageInput,
+        fileInput || undefined
+      );
     })
   );
 }
