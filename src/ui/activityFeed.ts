@@ -41,11 +41,11 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   private config: GitSpectraConfig;
   private workspacePath: string;
   private _view?: vscode.WebviewView;
-  
+
   // Activity data
   private activities: ActivityItem[] = [];
   private yourRecentFiles: Set<string> = new Set();
-  
+
   // Filters
   private filterAuthor: string | null = null;
   private filterBranch: string | null = null;
@@ -179,7 +179,10 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         files.forEach((f) => this.yourRecentFiles.add(f));
       }
 
-      log("ActivityFeed", `You've touched ${this.yourRecentFiles.size} files recently`);
+      log(
+        "ActivityFeed",
+        `You've touched ${this.yourRecentFiles.size} files recently`
+      );
     } catch (err) {
       log("ActivityFeed", `Could not load your recent files: ${err}`);
     }
@@ -246,7 +249,9 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
             const activity: ActivityItem = {
               id: commit.hash,
-              type: commit.message.toLowerCase().startsWith("merge") ? "merge" : "commit",
+              type: commit.message.toLowerCase().startsWith("merge")
+                ? "merge"
+                : "commit",
               author: commit.author,
               email: commit.email,
               date: commit.date,
@@ -371,10 +376,10 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
     // Group by date for timeline
     const groupedByDate = this.groupByDate(filtered);
-    
+
     // Group by person
     const groupedByPerson = this.groupByPerson(filtered);
-    
+
     // Hot files (multiple contributors)
     const hotFiles = this.getHotFiles(filtered);
 
@@ -392,13 +397,19 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
           <!-- Header with filters -->
           <div class="feed-header">
             <div class="view-tabs">
-              <button class="tab ${this.viewMode === "timeline" ? "active" : ""}" onclick="setViewMode('timeline')">
+              <button class="tab ${
+                this.viewMode === "timeline" ? "active" : ""
+              }" onclick="setViewMode('timeline')">
                 <i class="codicon codicon-rss"></i> Timeline
               </button>
-              <button class="tab ${this.viewMode === "person" ? "active" : ""}" onclick="setViewMode('person')">
+              <button class="tab ${
+                this.viewMode === "person" ? "active" : ""
+              }" onclick="setViewMode('person')">
                 <i class="codicon codicon-account"></i> By Person
               </button>
-              <button class="tab hot ${this.viewMode === "files" ? "active" : ""}" onclick="setViewMode('files')">
+              <button class="tab hot ${
+                this.viewMode === "files" ? "active" : ""
+              }" onclick="setViewMode('files')">
                 <i class="codicon codicon-flame"></i> Hot Files
               </button>
             </div>
@@ -406,21 +417,35 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <div class="filters">
               <select id="authorFilter" onchange="filterByAuthor(this.value)">
                 <option value="">All People</option>
-                ${authors.map((email) => {
-                  const name = this.activities.find((a) => a.email === email)?.author || email;
-                  return `<option value="${email}" ${this.filterAuthor === email ? "selected" : ""}>${name}</option>`;
-                }).join("")}
+                ${authors
+                  .map((email) => {
+                    const name =
+                      this.activities.find((a) => a.email === email)?.author ||
+                      email;
+                    return `<option value="${email}" ${
+                      this.filterAuthor === email ? "selected" : ""
+                    }>${name}</option>`;
+                  })
+                  .join("")}
               </select>
               
               <select id="branchFilter" onchange="filterByBranch(this.value)">
                 <option value="">All Branches</option>
-                ${branches.slice(0, 20).map((branch) => 
-                  `<option value="${branch}" ${this.filterBranch === branch ? "selected" : ""}>${branch}</option>`
-                ).join("")}
+                ${branches
+                  .slice(0, 20)
+                  .map(
+                    (branch) =>
+                      `<option value="${branch}" ${
+                        this.filterBranch === branch ? "selected" : ""
+                      }>${branch}</option>`
+                  )
+                  .join("")}
               </select>
               
-              ${this.filterAuthor || this.filterBranch ? 
-                '<button class="clear-btn" onclick="clearFilters()"><i class="codicon codicon-close"></i></button>' : ''
+              ${
+                this.filterAuthor || this.filterBranch
+                  ? '<button class="clear-btn" onclick="clearFilters()"><i class="codicon codicon-close"></i></button>'
+                  : ""
               }
               
               <button class="refresh-btn" onclick="refresh()" title="Refresh"><i class="codicon codicon-refresh"></i></button>
@@ -429,8 +454,16 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
 
           <!-- Content based on view mode -->
           <div class="feed-content">
-            ${this.viewMode === "timeline" ? this.renderTimeline(groupedByDate) : ""}
-            ${this.viewMode === "person" ? this.renderByPerson(groupedByPerson) : ""}
+            ${
+              this.viewMode === "timeline"
+                ? this.renderTimeline(groupedByDate)
+                : ""
+            }
+            ${
+              this.viewMode === "person"
+                ? this.renderByPerson(groupedByPerson)
+                : ""
+            }
             ${this.viewMode === "files" ? this.renderHotFiles(hotFiles) : ""}
           </div>
         </div>
@@ -1819,7 +1852,9 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   /**
    * Group activities by person
    */
-  private groupByPerson(activities: ActivityItem[]): Map<string, ActivityItem[]> {
+  private groupByPerson(
+    activities: ActivityItem[]
+  ): Map<string, ActivityItem[]> {
     const groups = new Map<string, ActivityItem[]>();
 
     for (const activity of activities) {
@@ -1844,8 +1879,13 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   /**
    * Get hot files (multiple contributors)
    */
-  private getHotFiles(activities: ActivityItem[]): Map<string, { contributors: Set<string>; activities: ActivityItem[] }> {
-    const fileMap = new Map<string, { contributors: Set<string>; activities: ActivityItem[] }>();
+  private getHotFiles(
+    activities: ActivityItem[]
+  ): Map<string, { contributors: Set<string>; activities: ActivityItem[] }> {
+    const fileMap = new Map<
+      string,
+      { contributors: Set<string>; activities: ActivityItem[] }
+    >();
 
     for (const activity of activities) {
       for (const file of activity.files) {
@@ -1911,8 +1951,8 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     const isLongMessage = activity.message.length > 80;
     const shortId = activity.id.slice(0, 8);
 
-    const branchIcon = isMainBranch 
-      ? '<i class="codicon codicon-git-merge"></i>' 
+    const branchIcon = isMainBranch
+      ? '<i class="codicon codicon-git-merge"></i>'
       : '<i class="codicon codicon-git-branch"></i>';
 
     const actionText = activity.isMerge
@@ -1923,49 +1963,93 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     const hasMoreFiles = activity.files.length > initialFiles;
 
     return `
-      <div class="activity-item ${hasOverlap ? "has-overlap" : ""} ${hasConflict ? "has-conflict" : ""}">
+      <div class="activity-item ${hasOverlap ? "has-overlap" : ""} ${
+      hasConflict ? "has-conflict" : ""
+    }">
         <img src="${avatarUrl}" class="avatar" alt="${activity.author}">
         <div class="activity-content">
           <div class="activity-header">
             <span class="author-name">${activity.author}</span>
             <span class="activity-action">${actionText}</span>
-            ${isMainBranch ? '<span class="main-badge"><i class="codicon codicon-verified"></i></span>' : ''}
+            ${
+              isMainBranch
+                ? '<span class="main-badge"><i class="codicon codicon-verified"></i></span>'
+                : ""
+            }
             <span class="time-ago">${timeAgo}</span>
           </div>
-          <div class="commit-message ${isLongMessage ? 'truncated' : ''}" id="msg-${shortId}" onclick="${isLongMessage ? `toggleMessage('${shortId}')` : ''}">
+          <div class="commit-message ${
+            isLongMessage ? "truncated" : ""
+          }" id="msg-${shortId}" onclick="${
+      isLongMessage ? `toggleMessage('${shortId}')` : ""
+    }">
             ${this.escapeHtml(activity.message)}
-            ${isLongMessage ? '<span class="expand-hint"><i class="codicon codicon-chevron-down"></i></span>' : ''}
+            ${
+              isLongMessage
+                ? '<span class="expand-hint"><i class="codicon codicon-chevron-down"></i></span>'
+                : ""
+            }
           </div>
-          ${activity.files.length > 0 ? `
+          ${
+            activity.files.length > 0
+              ? `
             <div class="files-summary" onclick="toggleFiles('${activity.id}')">
               <i class="codicon codicon-folder"></i>
-              <span>${activity.files.length} file${activity.files.length !== 1 ? "s" : ""}</span>
-              ${hasOverlap ? '<span class="you-badge"><i class="codicon codicon-warning"></i> You</span>' : ""}
+              <span>${activity.files.length} file${
+                  activity.files.length !== 1 ? "s" : ""
+                }</span>
+              ${
+                hasOverlap
+                  ? '<span class="you-badge"><i class="codicon codicon-warning"></i> You</span>'
+                  : ""
+              }
               <span class="expand-arrow">▾</span>
             </div>
             <div class="files-list" id="files-${activity.id}">
               <div class="files-view-toggle" onclick="event.stopPropagation()">
-                <button class="${this.fileViewMode === 'list' ? 'active' : ''}" onclick="setFileViewMode('list', event)" title="List view">
+                <button class="${
+                  this.fileViewMode === "list" ? "active" : ""
+                }" onclick="setFileViewMode('list', event)" title="List view">
                   <i class="codicon codicon-list-flat"></i>
                 </button>
-                <button class="${this.fileViewMode === 'tree' ? 'active' : ''}" onclick="setFileViewMode('tree', event)" title="Tree view">
+                <button class="${
+                  this.fileViewMode === "tree" ? "active" : ""
+                }" onclick="setFileViewMode('tree', event)" title="Tree view">
                   <i class="codicon codicon-list-tree"></i>
                 </button>
               </div>
-              ${this.renderFileList(activity.files.slice(0, initialFiles), activity.branch, this.fileViewMode)}
-              ${hasMoreFiles ? `
+              ${this.renderFileList(
+                activity.files.slice(0, initialFiles),
+                activity.branch,
+                this.fileViewMode
+              )}
+              ${
+                hasMoreFiles
+                  ? `
                 <div id="morefile-${shortId}" style="display: none;">
-                  ${this.renderFileList(activity.files.slice(initialFiles), activity.branch, this.fileViewMode)}
+                  ${this.renderFileList(
+                    activity.files.slice(initialFiles),
+                    activity.branch,
+                    this.fileViewMode
+                  )}
                 </div>
-                <button class="show-more-btn" id="morebtn-${shortId}" onclick="event.stopPropagation(); showMoreFiles('${shortId}', ${activity.files.length - initialFiles})">
-                  <i class="codicon codicon-chevron-down"></i> Show ${activity.files.length - initialFiles} more files
+                <button class="show-more-btn" id="morebtn-${shortId}" onclick="event.stopPropagation(); showMoreFiles('${shortId}', ${
+                      activity.files.length - initialFiles
+                    })">
+                  <i class="codicon codicon-chevron-down"></i> Show ${
+                    activity.files.length - initialFiles
+                  } more files
                 </button>
                 <button class="show-more-btn" id="lessbtn-${shortId}" style="display: none;" onclick="event.stopPropagation(); showLessFiles('${shortId}')">
                   <i class="codicon codicon-chevron-up"></i> Show less
                 </button>
-              ` : ''}
+              `
+                  : ""
+              }
             </div>
-          ` : ""}
+          `
+              : ""
+          }
         </div>
       </div>
     `;
@@ -1974,33 +2058,47 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   /**
    * Render file list in list or tree mode
    */
-  private renderFileList(files: ActivityFile[], branch: string, mode: "list" | "tree"): string {
+  private renderFileList(
+    files: ActivityFile[],
+    branch: string,
+    mode: "list" | "tree"
+  ): string {
     if (mode === "tree") {
       return this.renderFileTree(files, branch);
     }
-    
-    return files.map((file) => {
-      const fileName = file.path.split("/").pop() || file.path;
-      const fileIcon = this.getFileIcon(fileName);
-      // Simulate lines added/removed
-      const additions = Math.floor(Math.random() * 50);
-      const deletions = Math.floor(Math.random() * 20);
-      
-      return `
+
+    return files
+      .map((file) => {
+        const fileName = file.path.split("/").pop() || file.path;
+        const fileIcon = this.getFileIcon(fileName);
+        // Simulate lines added/removed
+        const additions = Math.floor(Math.random() * 50);
+        const deletions = Math.floor(Math.random() * 20);
+
+        return `
         <div class="list-file-row ${file.youAlsoTouched ? "you-touched" : ""}">
           <i class="codicon codicon-${fileIcon} list-file-icon"></i>
-          <span class="list-file-path" onclick="event.stopPropagation(); openFile('${file.path}')">${file.path}</span>
+          <span class="list-file-path" onclick="event.stopPropagation(); openFile('${
+            file.path
+          }')">${file.path}</span>
           <span class="list-file-changes">
             <span class="additions">+${additions}</span>
             <span class="deletions">-${deletions}</span>
           </span>
-          ${file.youAlsoTouched ? '<span class="you-badge-small">You</span>' : ""}
-          <button class="diff-btn-small" onclick="event.stopPropagation(); viewDiff('${file.path}', 'origin/${branch}')" title="View Diff">
+          ${
+            file.youAlsoTouched
+              ? '<span class="you-badge-small">You</span>'
+              : ""
+          }
+          <button class="diff-btn-small" onclick="event.stopPropagation(); viewDiff('${
+            file.path
+          }', 'origin/${branch}')" title="View Diff">
             <i class="codicon codicon-git-compare"></i>
           </button>
         </div>
       `;
-    }).join("");
+      })
+      .join("");
   }
 
   /**
@@ -2009,11 +2107,11 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   private renderFileTree(files: ActivityFile[], branch: string): string {
     // Build tree structure
     const tree: Record<string, any> = {};
-    
+
     for (const file of files) {
       const parts = file.path.split("/");
       let current = tree;
-      
+
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         if (i === parts.length - 1) {
@@ -2028,7 +2126,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         }
       }
     }
-    
+
     return this.renderTreeNode(tree, branch, 0);
   }
 
@@ -2039,7 +2137,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     const ext = filename.split(".").pop()?.toLowerCase() || "";
     const iconMap: Record<string, string> = {
       ts: "symbol-namespace",
-      tsx: "symbol-namespace", 
+      tsx: "symbol-namespace",
       js: "symbol-method",
       jsx: "symbol-method",
       json: "json",
@@ -2069,10 +2167,15 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   /**
    * Render a tree node recursively
    */
-  private renderTreeNode(node: Record<string, any>, branch: string, depth: number, parentId: string = ""): string {
+  private renderTreeNode(
+    node: Record<string, any>,
+    branch: string,
+    depth: number,
+    parentId: string = ""
+  ): string {
     let html = "";
     const indent = depth * 16;
-    
+
     // Sort: directories first, then files
     const entries = Object.entries(node).sort(([aKey, aVal], [bKey, bVal]) => {
       const aIsFile = aVal.__file !== undefined;
@@ -2080,7 +2183,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       if (aIsFile !== bIsFile) return aIsFile ? 1 : -1;
       return aKey.localeCompare(bKey);
     });
-    
+
     for (const [name, value] of entries) {
       if (value.__file) {
         // It's a file
@@ -2089,17 +2192,27 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         // Simulate lines added/removed (in real implementation, get from git)
         const additions = Math.floor(Math.random() * 50);
         const deletions = Math.floor(Math.random() * 20);
-        
+
         html += `
-          <div class="tree-row file-row ${file.youAlsoTouched ? "you-touched" : ""}" style="padding-left: ${indent + 20}px">
+          <div class="tree-row file-row ${
+            file.youAlsoTouched ? "you-touched" : ""
+          }" style="padding-left: ${indent + 20}px">
             <i class="codicon codicon-${fileIcon} tree-file-icon"></i>
-            <span class="tree-label file-label" onclick="event.stopPropagation(); openFile('${file.path}')">${name}</span>
+            <span class="tree-label file-label" onclick="event.stopPropagation(); openFile('${
+              file.path
+            }')">${name}</span>
             <span class="tree-changes">
               <span class="additions">+${additions}</span>
               <span class="deletions">-${deletions}</span>
             </span>
-            ${file.youAlsoTouched ? '<span class="you-badge-small">You</span>' : ""}
-            <button class="diff-btn-small" onclick="event.stopPropagation(); viewDiff('${file.path}', 'origin/${branch}')" title="View Diff">
+            ${
+              file.youAlsoTouched
+                ? '<span class="you-badge-small">You</span>'
+                : ""
+            }
+            <button class="diff-btn-small" onclick="event.stopPropagation(); viewDiff('${
+              file.path
+            }', 'origin/${branch}')" title="View Diff">
               <i class="codicon codicon-git-compare"></i>
             </button>
           </div>
@@ -2107,8 +2220,11 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       } else {
         // It's a directory
         const childCount = this.countFiles(value);
-        const folderId = `folder-${parentId}-${name}`.replace(/[^a-zA-Z0-9]/g, '-');
-        
+        const folderId = `folder-${parentId}-${name}`.replace(
+          /[^a-zA-Z0-9]/g,
+          "-"
+        );
+
         html += `
           <div class="tree-row folder-row" style="padding-left: ${indent}px" onclick="toggleFolder('${folderId}')">
             <i class="codicon codicon-chevron-down folder-chevron" id="chevron-${folderId}"></i>
@@ -2122,7 +2238,7 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
         `;
       }
     }
-    
+
     return html;
   }
 
@@ -2161,7 +2277,9 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
       const avatarUrl = this.getGravatarUrl(email);
       const lastActive = this.formatTimeAgo(activities[0].date);
       const branches = [...new Set(activities.map((a) => a.branch))];
-      const hasMainCommits = activities.some(a => this.mainBranches.has(a.branch));
+      const hasMainCommits = activities.some((a) =>
+        this.mainBranches.has(a.branch)
+      );
 
       html += `
         <div class="person-card" onclick="selectPerson('${email}')">
@@ -2170,11 +2288,25 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <div class="person-info">
               <div class="person-name">
                 ${author}
-                ${hasMainCommits ? '<span class="main-indicator" title="Committed to main"><i class="codicon codicon-verified"></i></span>' : ''}
+                ${
+                  hasMainCommits
+                    ? '<span class="main-indicator" title="Committed to main"><i class="codicon codicon-verified"></i></span>'
+                    : ""
+                }
               </div>
               <div class="person-branches">
-                ${branches.slice(0, 3).map((b) => `<span class="branch-chip"><i class="codicon codicon-git-branch"></i> ${b}</span>`).join("")}
-                ${branches.length > 3 ? `<span class="branch-more">+${branches.length - 3}</span>` : ""}
+                ${branches
+                  .slice(0, 3)
+                  .map(
+                    (b) =>
+                      `<span class="branch-chip"><i class="codicon codicon-git-branch"></i> ${b}</span>`
+                  )
+                  .join("")}
+                ${
+                  branches.length > 3
+                    ? `<span class="branch-more">+${branches.length - 3}</span>`
+                    : ""
+                }
               </div>
             </div>
           </div>
@@ -2201,7 +2333,12 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
   /**
    * Render hot files view
    */
-  private renderHotFiles(hotFiles: Map<string, { contributors: Set<string>; activities: ActivityItem[] }>): string {
+  private renderHotFiles(
+    hotFiles: Map<
+      string,
+      { contributors: Set<string>; activities: ActivityItem[] }
+    >
+  ): string {
     if (hotFiles.size === 0) {
       return `
         <div class="empty-state">
@@ -2217,13 +2354,13 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     for (const [filePath, data] of hotFiles) {
       const isYours = this.yourRecentFiles.has(filePath);
       const fileId = `hotfile-${index++}`;
-      
+
       // Sort activities by date (most recent first)
       const sortedActivities = [...data.activities]
         .filter((a) => a.files.some((f) => f.path === filePath))
         .sort((a, b) => b.date.getTime() - a.date.getTime())
         .slice(0, 10);
-      
+
       // Get file stats
       const branches = [...new Set(sortedActivities.map((a) => a.branch))];
       const firstChange = sortedActivities[sortedActivities.length - 1];
@@ -2237,11 +2374,17 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <div class="hot-file-info">
               <div class="hot-file-name">
                 <span class="hot-file-label" onclick="event.stopPropagation(); openFile('${filePath}')">${fileName}</span>
-                ${isYours ? '<span class="you-badge-inline"><i class="codicon codicon-warning"></i></span>' : ""}
+                ${
+                  isYours
+                    ? '<span class="you-badge-inline"><i class="codicon codicon-warning"></i></span>'
+                    : ""
+                }
               </div>
               <div class="hot-file-meta">${filePath}</div>
             </div>
-            <span class="heat-badge"><i class="codicon codicon-flame"></i> ${data.contributors.size}</span>
+            <span class="heat-badge"><i class="codicon codicon-flame"></i> ${
+              data.contributors.size
+            }</span>
             <div class="hot-file-quick-actions" onclick="event.stopPropagation()">
               <button class="icon-btn-small" onclick="openFile('${filePath}')" title="Open File">
                 <i class="codicon codicon-go-to-file"></i>
@@ -2254,19 +2397,30 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
           </div>
           
           <div class="contributors-row">
-            ${[...data.contributors].slice(0, 8).map((email) => {
-              const activity = data.activities.find((a) => a.email === email);
-              const name = activity?.author || email;
-              const avatarUrl = this.getGravatarUrl(email);
-              const timeAgo = activity ? this.formatTimeAgo(activity.date) : "";
-              return `
+            ${[...data.contributors]
+              .slice(0, 8)
+              .map((email) => {
+                const activity = data.activities.find((a) => a.email === email);
+                const name = activity?.author || email;
+                const avatarUrl = this.getGravatarUrl(email);
+                const timeAgo = activity
+                  ? this.formatTimeAgo(activity.date)
+                  : "";
+                return `
                 <div class="contributor-chip" title="${name} - ${timeAgo}">
                   <img src="${avatarUrl}" alt="${name}">
                   <span>${name.split(" ")[0]}</span>
                 </div>
               `;
-            }).join("")}
-            ${data.contributors.size > 8 ? `<span class="contributor-more">+${data.contributors.size - 8}</span>` : ""}
+              })
+              .join("")}
+            ${
+              data.contributors.size > 8
+                ? `<span class="contributor-more">+${
+                    data.contributors.size - 8
+                  }</span>`
+                : ""
+            }
           </div>
 
           <div class="hot-file-details" id="${fileId}">
@@ -2290,13 +2444,24 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <div class="detail-section">
               <div class="detail-label"><i class="codicon codicon-git-branch"></i> Branches</div>
               <div class="branch-list">
-                ${branches.slice(0, 5).map((b) => {
-                  const isMain = this.mainBranches.has(b);
-                  return `<span class="branch-tag ${isMain ? 'main' : ''}">
-                    <i class="codicon codicon-${isMain ? 'git-merge' : 'git-branch'}"></i> ${b}
+                ${branches
+                  .slice(0, 5)
+                  .map((b) => {
+                    const isMain = this.mainBranches.has(b);
+                    return `<span class="branch-tag ${isMain ? "main" : ""}">
+                    <i class="codicon codicon-${
+                      isMain ? "git-merge" : "git-branch"
+                    }"></i> ${b}
                   </span>`;
-                }).join("")}
-                ${branches.length > 5 ? `<span class="branch-more">+${branches.length - 5} more</span>` : ""}
+                  })
+                  .join("")}
+                ${
+                  branches.length > 5
+                    ? `<span class="branch-more">+${
+                        branches.length - 5
+                      } more</span>`
+                    : ""
+                }
               </div>
             </div>
 
@@ -2304,16 +2469,20 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
             <div class="detail-section">
               <div class="detail-label"><i class="codicon codicon-history"></i> Recent Changes</div>
               <div class="changes-timeline">
-                ${sortedActivities.slice(0, 5).map((activity) => {
-                  const avatarUrl = this.getGravatarUrl(activity.email);
-                  const timeAgo = this.formatTimeAgo(activity.date);
-                  const isMain = this.mainBranches.has(activity.branch);
-                  // Simulate lines changed (in real implementation, get from git diff --numstat)
-                  const additions = Math.floor(Math.random() * 80) + 1;
-                  const deletions = Math.floor(Math.random() * 30);
-                  return `
-                    <div class="change-item ${isMain ? 'merged' : ''}">
-                      <img src="${avatarUrl}" class="change-avatar" alt="${activity.author}">
+                ${sortedActivities
+                  .slice(0, 5)
+                  .map((activity) => {
+                    const avatarUrl = this.getGravatarUrl(activity.email);
+                    const timeAgo = this.formatTimeAgo(activity.date);
+                    const isMain = this.mainBranches.has(activity.branch);
+                    // Simulate lines changed (in real implementation, get from git diff --numstat)
+                    const additions = Math.floor(Math.random() * 80) + 1;
+                    const deletions = Math.floor(Math.random() * 30);
+                    return `
+                    <div class="change-item ${isMain ? "merged" : ""}">
+                      <img src="${avatarUrl}" class="change-avatar" alt="${
+                      activity.author
+                    }">
                       <div class="change-content">
                         <div class="change-header">
                           <span class="change-author">${activity.author}</span>
@@ -2322,24 +2491,41 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
                             <span class="additions">+${additions}</span>
                             <span class="deletions">-${deletions}</span>
                           </span>
-                          ${isMain ? '<span class="merged-badge-small"><i class="codicon codicon-check"></i> merged</span>' : '<span class="pending-badge"><i class="codicon codicon-git-pull-request"></i> pending</span>'}
+                          ${
+                            isMain
+                              ? '<span class="merged-badge-small"><i class="codicon codicon-check"></i> merged</span>'
+                              : '<span class="pending-badge"><i class="codicon codicon-git-pull-request"></i> pending</span>'
+                          }
                         </div>
-                        <div class="change-message">${this.escapeHtml(activity.message)}</div>
+                        <div class="change-message">${this.escapeHtml(
+                          activity.message
+                        )}</div>
                         <div class="change-branch">
-                          <span class="branch-chip ${isMain ? 'main' : ''}"><i class="codicon codicon-git-branch"></i> ${activity.branch}</span>
+                          <span class="branch-chip ${
+                            isMain ? "main" : ""
+                          }"><i class="codicon codicon-git-branch"></i> ${
+                      activity.branch
+                    }</span>
                         </div>
                       </div>
-                      <button class="diff-btn" onclick="event.stopPropagation(); viewDiff('${filePath}', 'origin/${activity.branch}')" title="View Diff">
+                      <button class="diff-btn" onclick="event.stopPropagation(); viewDiff('${filePath}', 'origin/${
+                      activity.branch
+                    }')" title="View Diff">
                         <i class="codicon codicon-git-compare"></i>
                       </button>
                     </div>
                   `;
-                }).join("")}
-                ${sortedActivities.length > 5 ? `
+                  })
+                  .join("")}
+                ${
+                  sortedActivities.length > 5
+                    ? `
                   <div class="change-item more">
                     <span>+${sortedActivities.length - 5} more changes</span>
                   </div>
-                ` : ""}
+                `
+                    : ""
+                }
               </div>
             </div>
 
@@ -2351,11 +2537,15 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
               <button class="icon-btn" onclick="viewDiff('${filePath}', 'origin/main')" title="Diff vs Main">
                 <i class="codicon codicon-git-compare"></i>
               </button>
-              ${isYours ? `
+              ${
+                isYours
+                  ? `
                 <button class="icon-btn warning" onclick="pullLatest()" title="Pull Latest">
                   <i class="codicon codicon-cloud-download"></i>
                 </button>
-              ` : ""}
+              `
+                  : ""
+              }
             </div>
           </div>
         </div>
@@ -2369,7 +2559,10 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
    * Get Gravatar URL
    */
   private getGravatarUrl(email: string, size: number = 64): string {
-    const hash = crypto.createHash("md5").update(email.toLowerCase().trim()).digest("hex");
+    const hash = crypto
+      .createHash("md5")
+      .update(email.toLowerCase().trim())
+      .digest("hex");
     return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=identicon`;
   }
 
@@ -2404,4 +2597,3 @@ export class ActivityFeedProvider implements vscode.WebviewViewProvider {
     this.config = config;
   }
 }
-

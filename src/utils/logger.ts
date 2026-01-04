@@ -2,12 +2,21 @@
  * GitSpectra Logger
  *
  * Centralized logging with ability to copy all logs.
+ * Set GITSPECTRA_DEBUG=true env var for verbose output.
  */
 
 import * as vscode from "vscode";
 
 const LOG_PREFIX = "[GitSpectra]";
 const MAX_LOG_ENTRIES = 1000;
+
+// Check for debug mode via env var or VS Code setting
+const isDebugMode = (): boolean => {
+  return (
+    process.env.GITSPECTRA_DEBUG === "true" ||
+    vscode.workspace.getConfiguration("gitspectra").get<boolean>("debugMode", false)
+  );
+};
 
 interface LogEntry {
   timestamp: Date;
@@ -19,9 +28,19 @@ interface LogEntry {
 class GitSpectraLogger {
   private logs: LogEntry[] = [];
   private outputChannel: vscode.OutputChannel;
+  private hasShownChannel = false;
 
   constructor() {
     this.outputChannel = vscode.window.createOutputChannel("GitSpectra");
+    
+    // Auto-show output in debug mode
+    if (isDebugMode()) {
+      this.outputChannel.show(true); // true = preserve focus
+      this.outputChannel.appendLine("🔧 DEBUG MODE ENABLED");
+      this.outputChannel.appendLine(`   Workspace: ${vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath).join(", ") || "none"}`);
+      this.outputChannel.appendLine(`   Time: ${new Date().toISOString()}`);
+      this.outputChannel.appendLine("─".repeat(60));
+    }
   }
 
   private addEntry(

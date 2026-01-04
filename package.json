@@ -119,6 +119,11 @@
           "default": true,
           "description": "Enable GitSpectra conflict detection"
         },
+        "gitspectra.debugMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug mode - shows verbose logging in the Output panel"
+        },
         "gitspectra.fetchInterval": {
           "type": "number",
           "default": 300,
